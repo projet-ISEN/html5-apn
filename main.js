@@ -3,6 +3,7 @@ let video = document.getElementById('video');
 let canvas = document.getElementById('canvas');
 let shootButton = document.getElementById("shoot");
 let resetButton = document.getElementById("reset");
+let saveButton = document.getElementById("save");
 let picLong = document.getElementById("picLong");
 let picLat = document.getElementById("picLat");
 let picAlt = document.getElementById("picAlt");
@@ -112,7 +113,9 @@ resetButton.addEventListener('click', (e) => {
 });
 
 
-
+saveButton.addEventListener('click', (e)=> {
+    window.open(canvas.toDataURL(), '_TOP');
+});
 
 
 /**
