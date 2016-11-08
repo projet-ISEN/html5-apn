@@ -9,7 +9,7 @@ let picLat = document.getElementById("picLat");
 let picAlt = document.getElementById("picAlt");
 let picDate = document.getElementById("picDate");
 let context = canvas.getContext('2d');
-let target = document.getElementById("target")
+let target = document.getElementById("target");
 let targetContext = target.getContext('2d');
 let dateField = document.getElementById("infos");
 
@@ -30,6 +30,7 @@ video.addEventListener('canplay', (event) => {
  */
 let db = new Dexie("cameraApp");
 let dbOK = true;
+let pics = [];
 db.version(1).stores({
     pics: 'id, data, gps'
 });
@@ -39,8 +40,10 @@ db.open().catch((e) => {
     dbOK = false;
 });
 
-db.pics.each((friend) => {
-    console.log(friend);
+db.pics.each((pic) => {
+    console.log(pic);
+    pics.push(pic);
+    refreshList();
 });
 
 /**
@@ -118,24 +121,19 @@ saveButton.addEventListener('click', (e)=> {
 });
 
 
-/**
- * 
- * @param {any} pos
- */
-function handlePosition(pos) {
-  // pos.latitude	The latitude as a decimal number (always returned)
-  // pos.longitude	The longitude as a decimal number (always returned)
-  // pos.accuracy	The accuracy of position (always returned)
-  // pos.altitude	The altitude in meters above the mean sea level (returned if available)
-  // pos.altitudeAccuracy	The altitude accuracy of position (returned if available)
-  // pos.heading	The heading as degrees clockwise from North (returned if available)
-  // pos.speed The speed in meters per second (returned if available)
-  console.log(pos);
-  position = pos;
-}
-
 if (navigator.geolocation) {
-        navigator.geolocation.watchPosition(handlePosition, (err) => {
+        navigator.geolocation.watchPosition(
+            (pos) => {
+                // pos.latitude	The latitude as a decimal number (always returned)
+                // pos.longitude	The longitude as a decimal number (always returned)
+                // pos.accuracy	The accuracy of position (always returned)
+                // pos.altitude	The altitude in meters above the mean sea level (returned if available)
+                // pos.altitudeAccuracy	The altitude accuracy of position (returned if available)
+                // pos.heading	The heading as degrees clockwise from North (returned if available)
+                // pos.speed The speed in meters per second (returned if available)
+                console.log(pos);
+                position = pos.coords;
+            }, (err) => {
           switch(err.code) {
             case err.PERMISSION_DENIED:
                 console.error("User denied the request for Geolocation.");
@@ -151,6 +149,41 @@ if (navigator.geolocation) {
                 break;
         }
         });
+        //console.log(navigator.geolocation.getCurrentPosition((pos) => {console.log(pos)}, (err) => {console.log(err)}));
 } else {
   console.error("Your browser doesn't support this feature");
+}
+
+/**
+ * Build a list based on items
+ */
+refreshList = () => {
+
+}
+buildList = (data) => {
+    let i, item, ref = {}, counts = {};
+    function ul() {
+        return document.createElement('ul');
+    }
+    function li(text) {
+        var e = document.createElement('li');
+        e.appendChild(document.createTextNode(text));
+        return e;
+    }
+
+    ref[0] = ul();
+    counts[0] = 1;
+    
+    for (i = 0; i < data.length; ++i) {
+        ref[data[i].parentId].appendChild(li(data[i]['name'])); // create <li>
+        ref[data[i].id] = ul(); // assume + create <ul>
+        ref[data[i].parentId].appendChild(ref[data[i].id]);
+        counts[data[i].id] = 0;
+        counts[data[i].parentId] += 1;
+    }
+    
+    for (i in counts) // for every <ul>
+        if (counts[i] === 0) // if it never had anything appened to it
+            ref[i].parentNode.removeChild(ref[i]); // remove it
+    return ref[0];
 }
