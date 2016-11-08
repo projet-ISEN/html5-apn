@@ -1,54 +1,86 @@
 <!DOCTYPE html>
 <html>
-    <head>
-        <meta charset="utf-8">
-        <title>Camera API</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-        <!-- Compiled and minified CSS -->
-        <link rel="stylesheet" href="./css/materialize.min.css">
-        <link rel="stylesheet" href="./css/default.css">
-        <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+	<head>
+		<meta charset="utf-8">
+		<title>Camera API</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+		<!-- Compiled and minified CSS -->
+		<link rel="stylesheet" href="./css/materialize.min.css">
+		<link rel="stylesheet" href="./css/default.css">
+		<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+	</head>
+	<body>
+		<nav class="row">
+			<div class="nav-wrapper">
+				<a href="#" class="title">Camera HTML5</a>
+			</div>
+		</nav>
+		<div class="container main">
+			<div class="row">
+				<div class="col s12">
+					<video id="video" width="1500" height="1500" autoplay></video>
+					<canvas id="target" width="1500" height="1500"></canvas>
+				</div>
+			</div>
+			<div class="col s12">
+				<canvas id="canvas" width="1500" height="1500"></canvas>
+			</div>
+		</div>
+<!--		<div class="row">
+			<div class="col s12">
+				<h2>Informations :</h2>
+				<p>Long : <span id="picLong"></span></p>
+				<p>Lat : <span id="picLat"></span></p>
+				<p>Alt : <span id="picAlt"></span></p>
+				<p>Date : <span id="picDate"></span></p>
+			</div>
+		</div>-->
+			<div class="row">
+             <table class="centered col s8 offset-s2">
+<!--        <thead>
+          <tr>
+              <th data-field="id">Name</th>
+              <th data-field="name">Item Name</th>
+          </tr>
+        </thead>-->
 
-    </head>
-    <body>
-
-        <nav>
-    <div class="nav-wrapper">
-      <a href="#" class="title">Camera HTML5</a>
-    </div>
-  </nav>
-
-      <div class="container main">
-        <div class="row">
-          <div class="col s12">
-            <video id="video" width="1500" height="1500" autoplay></video>
-            <canvas id="target" width="1500" height="1500"></canvas>
-          </div>
+        <tbody >
+          <tr>
+            <td>Long</td>
+            <td id="picLong"></td>
+          </tr>
+          <tr>
+            <td>Lat</td>
+            <td id="picLat"></td>
+          </tr>
+          <tr>
+            <td>Alt</td>
+            <td id="picAlt"></td>
+          </tr>
+          <tr>
+            <td>Date</td>
+            <td id="picDate"></td>
+          </tr>
+        </tbody>
+      </table>
         </div>
-        <div class="row">
-          <div class="col s6">
-            <canvas id="canvas" width="1500" height="1500"></canvas>
-          </div>
-          <div class="col s6">
-            <h2>Informations :</h2>
-            <p>Long : <span id="picLong"></span></p>
-            <p>Lat : <span id="picLat"></span></p>
-            <p>Alt : <span id="picAlt"></span></p>
-            <p>Date : <span id="picDate"></span></p>
-          </div>
-        </div>
-        <div class="row">
-<a  id="save" class="waves-effect waves-light btn-large"><i class="material-icons right">send</i>Save</a>
-<a  id="shoot" class="waves-effect waves-light btn-large"><i class="material-icons right">camera_enhance</i>Shoot</a>
-<a  id="reset" class="waves-effect waves-light btn-large"><i class="material-icons right">clear_all</i>Reset</a>
-        </div>
-      </div>
+			<div class="row">
+                <div class="col s8 offset-s2 center-align">
+				<a  id="save" class="waves-effect waves-light btn-large"><i class="material-icons right">send</i>Save</a>
+				<a  id="shoot" class="waves-effect waves-light btn-large"><i class="material-icons right">camera_enhance</i>Shoot</a>
+				<a  id="reset" class="waves-effect waves-light btn-large"><i class="material-icons right">clear_all</i>Reset</a>
+                </div>
+			</div>
 
-      <script rel="application/javascript" src="./dexie.js" ></script>
-<!--
-        <script src="./materialize.min.js"></script>
--->
+        <footer class="row center-align valign-wrapper">
+            <span class="valign">Collignon Rémi et Riouallon Vincent</span>
 
-      <script src="./main.js"></script>
-    </body>
+        </footer>
+
+		<script rel="application/javascript" src="./dexie.js" ></script>
+		<!--
+			<script src="./materialize.min.js"></script>
+			-->
+		<script src="./main.js"></script>
+	</body>
 </html>
