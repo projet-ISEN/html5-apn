@@ -10,6 +10,7 @@
     <style>
       body {
         position: relative;
+        box-sizing: border-box;
       }
       #video {
         width: 100%;
@@ -26,10 +27,14 @@
         right: 0;
       }
       #target {
+        top: 0;
+        height: 100%;
         position: absolute;
+        text-align: center;
       }
-      .row, col-sm-12 {
-        position: relative;
+      .row, .col-sm-12 {
+        display: flex;
+        justify-content: center;
       }
     </style>
 
@@ -37,8 +42,8 @@
       <div class="container-fluid">
         <div class="row">
           <div class="col-sm-12">
-            <video id="video" width="1200" height="1200" autoplay></video>
-            <canvas id="target" width="200" height="200"></canvas>
+            <video id="video" width="800" height="800" autoplay></video>
+            <canvas id="target" width="500" height="500"></canvas>
           </div>
         </div>
         <div class="row">

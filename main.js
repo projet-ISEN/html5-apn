@@ -8,23 +8,40 @@ let picLat = document.getElementById("picLat");
 let picAlt = document.getElementById("picAlt");
 let picDate = document.getElementById("picDate");
 let context = canvas.getContext('2d');
-let target = document.getElementById("target").getContext('2d');
+let target = document.getElementById("target")
+let targetContext = target.getContext('2d');
 let dateField = document.getElementById("infos");
 
 var position = {};
 
 video.addEventListener('canplay', (event) => {
     event.preventDefault();
-    window.requestAnimationFrame(play);
+    //window.requestAnimationFrame(play);
 });
 
 navigator.getUserMedia({ 
   video: true,
   audio: false 
 }, (stream) => {
+
     streaming = true;
     video.src = URL.createObjectURL(stream);
-    video.play();
+    targetContext.beginPath();
+    targetContext.arc(target.width / 2, target.height / 2, target.width / 8, 0, 2 * Math.PI);
+    targetContext.lineWidth = 3;
+    targetContext.stroke();
+
+    targetContext.beginPath();
+    targetContext.moveTo(target.width / 4, target.height / 2);
+    targetContext.lineTo(target.width / 4 + target.width / 2, target.height / 2);
+    targetContext.stroke();
+
+    targetContext.beginPath();
+    targetContext.moveTo(target.width / 2, target.height / 4);
+    targetContext.lineTo(target.width / 2, target.height / 4 + target.height / 2);
+    targetContext.stroke();
+
+
 }, (err) => {
   console.error("Your browser doesn't support this feature", err);
 });
@@ -86,14 +103,12 @@ if (navigator.geolocation) {
   console.error("Your browser doesn't support this feature");
 }
 
-function play() {
+/*function play() {
 
     let width = canvas.getAttribute('width');
     let height = canvas.getAttribute('height');
 
-    if(streaming) {
-      context.drawImage(video, 0, 0, width, height);
-    }
+    context.drawImage(video, 0, 0, width, height);
 
     context.beginPath();
     context.arc(width / 2, height / 2, width / 8, 0, 2 * Math.PI);
@@ -114,4 +129,4 @@ function play() {
     context.stroke();
 
     window.requestAnimationFrame(play);
-}
+}*/
