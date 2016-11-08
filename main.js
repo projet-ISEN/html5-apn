@@ -9,7 +9,7 @@ let picLat = document.getElementById("picLat");
 let picAlt = document.getElementById("picAlt");
 let picDate = document.getElementById("picDate");
 let context = canvas.getContext('2d');
-let target = document.getElementById("target")
+let target = document.getElementById("target");
 let targetContext = target.getContext('2d');
 let dateField = document.getElementById("infos");
 
@@ -132,7 +132,7 @@ if (navigator.geolocation) {
                 // pos.heading	The heading as degrees clockwise from North (returned if available)
                 // pos.speed The speed in meters per second (returned if available)
                 console.log(pos);
-                position = pos;
+                position = pos.coords;
             }, (err) => {
           switch(err.code) {
             case err.PERMISSION_DENIED:
@@ -149,7 +149,7 @@ if (navigator.geolocation) {
                 break;
         }
         });
-        console.log(navigator.geolocation.getCurrentPosition((pos) => {console.log(pos)}, (err) => {console.log(err)}));
+        //console.log(navigator.geolocation.getCurrentPosition((pos) => {console.log(pos)}, (err) => {console.log(err)}));
 } else {
   console.error("Your browser doesn't support this feature");
 }
