@@ -12,13 +12,35 @@ let target = document.getElementById("target")
 let targetContext = target.getContext('2d');
 let dateField = document.getElementById("infos");
 
+/**
+ * GPS position
+ */
 var position = {};
 
+/**
+ * Prevent bad things 
+ */
 video.addEventListener('canplay', (event) => {
     event.preventDefault();
-    //window.requestAnimationFrame(play);
 });
 
+/**
+ * Init DB
+ */
+let db = new Dexie("cameraApp");
+let dbOK = true;
+db.version(1).stores({
+    pics: 'id, data, gps'
+});
+
+db.open().catch((e) => {
+    console.error(e);
+    dbOK = false;
+});
+
+/**
+ * Request and start Camera 
+ */
 navigator.getUserMedia({ 
   video: true,
   audio: false 
@@ -28,7 +50,7 @@ navigator.getUserMedia({
     video.src = URL.createObjectURL(stream);
     targetContext.beginPath();
     targetContext.arc(target.width / 2, target.height / 2, target.width / 8, 0, 2 * Math.PI);
-    targetContext.lineWidth = 3;
+    targetContext.lineWidth = 4;
     targetContext.stroke();
 
     targetContext.beginPath();
@@ -40,8 +62,6 @@ navigator.getUserMedia({
     targetContext.moveTo(target.width / 2, target.height / 4);
     targetContext.lineTo(target.width / 2, target.height / 4 + target.height / 2);
     targetContext.stroke();
-
-
 }, (err) => {
   console.error("Your browser doesn't support this feature", err);
 });
@@ -51,11 +71,28 @@ navigator.getUserMedia({
  */
 shootButton.addEventListener("click", (e) => {
 	
+    let now = new Date();
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
     picLong.innerHTML = position.longitude;
     picLat.innerHTML = position.latitude;
     picAlt.innerHTML = position.altitude;
-    picDate.innerHTML = new Date();
+    picDate.innerHTML = now;
+
+    console.log(context.getImageData(0, 0, canvas.width, canvas.height));
+    // STORE PICS
+    db.pics.put({
+        id: Date.now(now.getTime()),
+        data: context.getImageData(0, 0, canvas.width, canvas.height),
+        gps: {
+            long: position.longitude,
+            lat: position.latitude,
+            alt: position.altitude
+        }
+    }).then(() => {
+        console.info('Image stored');
+    }).catch((err) =>  {
+        console.error(error);
+    });
 });
 
 /**
@@ -102,31 +139,3 @@ if (navigator.geolocation) {
 } else {
   console.error("Your browser doesn't support this feature");
 }
-
-/*function play() {
-
-    let width = canvas.getAttribute('width');
-    let height = canvas.getAttribute('height');
-
-    context.drawImage(video, 0, 0, width, height);
-
-    context.beginPath();
-    context.arc(width / 2, height / 2, width / 8, 0, 2 * Math.PI);
-    context.lineWidth = 2;
-    //context.strokeStyle = 'black';
-    context.stroke();
-
-    context.beginPath();
-    context.moveTo(width / 4, height / 2);
-    context.lineTo(width / 4 + width / 2, height / 2);
-    //context.strokeStyle = 'red';
-    context.stroke();
-
-    context.beginPath();
-    context.moveTo(width / 2, height / 4);
-    context.lineTo(width / 2, height / 4 + height / 2);
-    //context.strokeStyle = 'red';
-    context.stroke();
-
-    window.requestAnimationFrame(play);
-}*/
