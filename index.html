@@ -5,43 +5,10 @@
         <title>Camera API</title>
         <link rel="stylesheet" href="css/base.css" type="text/css" media="screen">
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-        <link rel="stylesheet" href="./bootstrap.min.css">
+        <link rel="stylesheet" href="./default.css">
+        <!-- Compiled and minified CSS -->
+        <link rel="stylesheet" href="./materialize.min.css">
     </head>
-    <style>
-      body {
-        position: relative;
-        box-sizing: border-box;
-      }
-      #video {
-        width: 100%;
-        height: 100%;
-      }
-      #shoot {
-        position: fixed;
-        bottom : 0;
-        left: 0;
-      }
-      #reset {
-        position: fixed;
-        bottom: 0;
-        right: 0;
-      }
-      #target {
-        top: 0;
-        height: 100%;
-        position: absolute;
-        text-align: center;
-      }
-      #canvas {
-        width: 100%;
-        height: 100%;
-      }
-      .row, .col-sm-12 {
-        display: flex;
-        justify-content: center;
-      }
-    </style>
-
     <body>
       <div class="container-fluid col-sm-6 col-sm-offset-3">
         <div class="row">
@@ -69,6 +36,8 @@
       </div>
 
       <script rel="application/javascript" src="./dexie.js" ></script>
+        <script src="./materialize.min.js"></script>
+
       <script src="./main.js"></script>
     </body>
 </html>
