@@ -1,5 +1,6 @@
 body {
         position: relative;
+    box-sizing: border-box;
       }
       #video {
         width: 100%;
@@ -17,7 +18,18 @@ body {
       }
       #target {
         position: absolute;
+        top: 0;
+          height: 100%;
+          text-align: center;
       }
-      .row, col-sm-12 {
+      .row, .col.s12 {
         position: relative;
       }
+#canvas{
+    width: 100%;
+    height: 100%;
+}
+    .col.s12{
+        display: flex;
+        justify-content: center;
+    }
