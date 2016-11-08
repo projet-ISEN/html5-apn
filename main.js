@@ -40,13 +40,25 @@ db.open().catch((e) => {
     dbOK = false;
 });
 
-db.pics.each((pic) => {
-    console.log(pic);
+/*db.pics.each((pic) => {
+    console.log(db.pics.count());
     pics.push(pic);
     refreshList();
-    carouselselector.append("<a class='carousel-item'><img src=''></a>");
+    carouselselector.append("<a class='carousel-item'><img src='"+pic.url+"'></a>");
+});*/
 
-});
+
+db.pics.toArray( (pics) => {
+    console.log(pics);
+    for(i=0;i<pics.length;i++){
+        carouselselector.append("<a class='carousel-item'><img src='"+pics[i].url+"'></a>");
+        //pics.push(pics[i]);
+    }
+       $(document).ready(function(){
+      $('.carousel').carousel();
+    });
+} );
+
 
 /**
  * Request and start Camera 
