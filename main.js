@@ -32,7 +32,7 @@ let db = new Dexie("cameraApp");
 let dbOK = true;
 let pics = [];
 db.version(1).stores({
-    pics: 'id, data, gps'
+    pics: 'id, url, gps'
 });
 
 db.open().catch((e) => {
@@ -79,18 +79,19 @@ navigator.getUserMedia({
  */
 shootButton.addEventListener("click", (e) => {
 	
+    // Display
     let now = new Date();
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
     picLong.innerHTML = position.longitude;
     picLat.innerHTML = position.latitude;
     picAlt.innerHTML = position.altitude;
     picDate.innerHTML = now;
+    //console.log(context.getImageData(0, 0, canvas.width, canvas.height));
 
-    console.log(context.getImageData(0, 0, canvas.width, canvas.height));
     // STORE PICS
     db.pics.put({
         id: Date.now(now.getTime()),
-        data: context.getImageData(0, 0, canvas.width, canvas.height),
+        url: canvas.toDataURL(), // context.getImageData(0, 0, canvas.width, canvas.height),
         gps: {
             long: position.longitude,
             lat: position.latitude,
@@ -101,6 +102,9 @@ shootButton.addEventListener("click", (e) => {
     }).catch((err) =>  {
         console.error(error);
     });
+    
+    // Update MAP
+    mapMarker.setLatLng(L.latLng(position.latitude, position.longitude));
 });
 
 /**
@@ -187,3 +191,23 @@ buildList = (data) => {
             ref[i].parentNode.removeChild(ref[i]); // remove it
     return ref[0];
 }
+
+
+/**
+ * MAP Initialisation
+ */
+
+let map = L.map('map').setView([51.505, -0.09], 13);
+
+/*L.tileLayer('https://{s}.tile.osm.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+}).addTo(map);*/
+L.tileLayer('https://stamen-tiles-{s}.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors',
+
+}).addTo(map);
+
+let mapMarker = L.marker([0, 0])
+.addTo(map)
+.bindPopup('Your pics was take here!')
+.openPopup();
