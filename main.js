@@ -12,7 +12,7 @@ let context = canvas.getContext('2d');
 let target = document.getElementById("target");
 let targetContext = target.getContext('2d');
 let dateField = document.getElementById("infos");
-
+var carouselselector = $(".carousel");
 /**
  * GPS position
  */
@@ -44,6 +44,8 @@ db.pics.each((pic) => {
     console.log(pic);
     pics.push(pic);
     refreshList();
+    carouselselector.append("<a class='carousel-item'><img src=''></a>");
+
 });
 
 /**
@@ -187,3 +189,7 @@ buildList = (data) => {
             ref[i].parentNode.removeChild(ref[i]); // remove it
     return ref[0];
 }
+
+/*  $(document).ready(function(){
+      $('.carousel').carousel();
+    });*/
