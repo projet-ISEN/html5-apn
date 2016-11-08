@@ -10,7 +10,7 @@ body {
         width: 100%;
         height: 35rem;
       }
-      #shoot {
+/*      #shoot {
         position: fixed;
         bottom : 0;
         left: 0;
@@ -19,7 +19,7 @@ body {
         position: fixed;
         bottom: 0;
         right: 0;
-      }
+      }*/
       #target {
         position: absolute;
         top: 0;
