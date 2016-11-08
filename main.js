@@ -38,6 +38,10 @@ db.open().catch((e) => {
     dbOK = false;
 });
 
+db.pics.each((friend) => {
+    console.log(friend);
+});
+
 /**
  * Request and start Camera 
  */
@@ -107,6 +111,14 @@ resetButton.addEventListener('click', (e) => {
     picDate.innerHTML = "";
 });
 
+
+
+
+
+/**
+ * 
+ * @param {any} pos
+ */
 function handlePosition(pos) {
   // pos.latitude	The latitude as a decimal number (always returned)
   // pos.longitude	The longitude as a decimal number (always returned)
