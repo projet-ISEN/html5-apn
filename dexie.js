@@ -828,7 +828,7 @@ function Listener(onFulfilled, onRejected, resolve, reject, zone) {
 props(Promise, {
     all: function () {
         var values = getArrayOf.apply(null, arguments) // Supports iterables, implicit arguments and array-like.
-        .map(onPossibleParallellAsync); // Handle parallell async/awaits 
+        .map(onPossibleParallellAsync); // Handle parallell async/awaits
         return new Promise(function (resolve, reject) {
             if (values.length === 0) resolve([]);
             var remaining = values.length;
@@ -2894,7 +2894,7 @@ function Dexie(dbName, options) {
             });
             return this;
         },
-        /*lock: function (fn) { 
+        /*lock: function (fn) {
             if (this._locked()) return new Promise ((resolve, reject) => {
                 this._blockedFuncs.push(()=>{
                     this.lock(fn).then(resolve, reject);

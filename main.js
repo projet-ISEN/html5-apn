@@ -46,13 +46,12 @@ db.pics.toArray( (pics) => {
     console.log(pics);
     for(i=0;i<pics.length;i++){
        addCarousel(pics[i],0);
-        carouselselector.append("<a class='carousel-item'><img src='"+pics[i].url+"'></a>");
+        //carouselselector.append("<a class='carousel-item'><img src='"+pics[i].url+"'></a>");
         addMarker(pics[i].gps.lat, pics[i].gps.long, `<img src=\"${pics[i].url}\" />`)
         //pics.push(pics[i]);
     }
-       $(document).ready(function(){
-      $('.carousel').carousel();
-    });
+      carouselselector.carousel();
+
 } );
 
 
@@ -94,18 +93,27 @@ navigator.getUserMedia({
 });
 
 /**
- * 
+ *
  * @param {any} pic
  * @param {any} left
  */
 function addCarousel(pic,left){
     carouselselector.append("<a class='carousel-item'><img src='"+pic.url+"' long='"+pic.gps.long+"' lat='"+pic.gps.lat+"' alt='"+pic.gps.alt+"' date='"+pic.id+"' >");
     if(left){
-    $('.carousel').removeClass('initialized');
-    $('.carousel').carousel();
-    $('.carousel').carousel('prev');
+    carouselselector.removeClass('initialized');
+    carouselselector.carousel();
+    carouselselector.carousel('prev');
     }
 }
+
+document.getElementsByClassName("carousel")[0].addEventListener("click", (e) => {
+    //alert("changement");
+    let target = $('.carousel-item').filter(function() {
+     return $(this).css('apacity') == '1';
+});
+    console.log(target.attr("src"));
+});
+
 
 /**
  * Trigger photo take
@@ -197,7 +205,7 @@ if (navigator.geolocation) {
  */
 
 /**
- * 
+ *
  * @param {any} data
  * @returns
  */
