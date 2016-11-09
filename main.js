@@ -51,12 +51,9 @@ db.open().catch((e) => {
 db.pics.toArray( (pics) => {
     console.log(pics);
     for(i=0;i<pics.length;i++){
-<<<<<<< HEAD
        addCarousel(pics[i],0);
-=======
         carouselselector.append("<a class='carousel-item'><img src='"+pics[i].url+"'></a>");
         addMarker(pics[i].gps.lat, pics[i].gps.long, `<img src=\"${pics[i].url}\" />`)
->>>>>>> origin/master
         //pics.push(pics[i]);
     }
        $(document).ready(function(){
