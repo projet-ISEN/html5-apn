@@ -51,7 +51,7 @@ db.open().catch((e) => {
 db.pics.toArray( (pics) => {
     console.log(pics);
     for(i=0;i<pics.length;i++){
-        carouselselector.append("<a class='carousel-item'><img src='"+pics[i].url+"'></a>");
+       addCarousel(pics[i],0);
         //pics.push(pics[i]);
     }
        $(document).ready(function(){
@@ -88,6 +88,15 @@ navigator.getUserMedia({
   console.error("Your browser doesn't support this feature", err);
 });
 
+function addCarousel(pic,left){
+    carouselselector.append("<a class='carousel-item'><img src='"+pic.url+"'>");
+    if(left){
+    $('.carousel').removeClass('initialized');
+    $('.carousel').carousel();
+    $('.carousel').carousel('prev');
+    }
+}
+
 /**
  * Trigger photo take
  */
@@ -101,7 +110,8 @@ shootButton.addEventListener("click", (e) => {
     picAlt.innerHTML = position.altitude;
     picDate.innerHTML = now;
     //console.log(context.getImageData(0, 0, canvas.width, canvas.height));
-
+    var temp=  {url:canvas.toDataURL().toString()};
+    addCarousel(temp,1);
     // STORE PICS
     db.pics.put({
         id: Date.now(now.getTime()),
