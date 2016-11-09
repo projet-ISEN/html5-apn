@@ -10,7 +10,7 @@
 *
 * By David Fahlander, david.fahlander@gmail.com
 *
-* Version 1.5.1, Tue Nov 01 2016
+* Version 2.0.0-beta.4, Tue Nov 01 2016
 * www.dexie.com
 * Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
 */
@@ -39,8 +39,10 @@ function props(proto, extension) {
     });
 }
 
+var defineProperty = Object.defineProperty;
+
 function setProp(obj, prop, functionOrGetSet, options) {
-    Object.defineProperty(obj, prop, extend(functionOrGetSet && hasOwn(functionOrGetSet, "get") && typeof functionOrGetSet.get === 'function' ? { get: functionOrGetSet.get, set: functionOrGetSet.set, configurable: true } : { value: functionOrGetSet, configurable: true, writable: true }, options));
+    defineProperty(obj, prop, extend(functionOrGetSet && hasOwn(functionOrGetSet, "get") && typeof functionOrGetSet.get === 'function' ? { get: functionOrGetSet.get, set: functionOrGetSet.set, configurable: true } : { value: functionOrGetSet, configurable: true, writable: true }, options));
 }
 
 function derive(Child) {
@@ -273,6 +275,197 @@ function flatten(a) {
     return concat.apply([], a);
 }
 
+// By default, debug will be true only if platform is a web platform and its page is served from localhost.
+// When debug = true, error's stacks will contain asyncronic long stacks.
+var debug = typeof location !== 'undefined' &&
+// By default, use debug mode if served from localhost.
+/^(http|https):\/\/(localhost|127\.0\.0\.1)/.test(location.href);
+
+function setDebug(value, filter) {
+    debug = value;
+    libraryFilter = filter;
+}
+
+var libraryFilter = function () {
+    return true;
+};
+
+var NEEDS_THROW_FOR_STACK = !new Error("").stack;
+
+function getErrorWithStack() {
+    "use strict";
+
+    if (NEEDS_THROW_FOR_STACK) try {
+        // Doing something naughty in strict mode here to trigger a specific error
+        // that can be explicitely ignored in debugger's exception settings.
+        // If we'd just throw new Error() here, IE's debugger's exception settings
+        // will just consider it as "exception thrown by javascript code" which is
+        // something you wouldn't want it to ignore.
+        getErrorWithStack.arguments;
+        throw new Error(); // Fallback if above line don't throw.
+    } catch (e) {
+        return e;
+    }
+    return new Error();
+}
+
+function prettyStack(exception, numIgnoredFrames) {
+    var stack = exception.stack;
+    if (!stack) return "";
+    numIgnoredFrames = numIgnoredFrames || 0;
+    if (stack.indexOf(exception.name) === 0) numIgnoredFrames += (exception.name + exception.message).split('\n').length;
+    return stack.split('\n').slice(numIgnoredFrames).filter(libraryFilter).map(function (frame) {
+        return "\n" + frame;
+    }).join('');
+}
+
+function deprecated(what, fn) {
+    return function () {
+        console.warn(what + " is deprecated. See https://github.com/dfahlander/Dexie.js/wiki/Deprecations. " + prettyStack(getErrorWithStack(), 1));
+        return fn.apply(this, arguments);
+    };
+}
+
+var dexieErrorNames = ['Modify', 'Bulk', 'OpenFailed', 'VersionChange', 'Schema', 'Upgrade', 'InvalidTable', 'MissingAPI', 'NoSuchDatabase', 'InvalidArgument', 'SubTransaction', 'Unsupported', 'Internal', 'DatabaseClosed', 'PrematureCommit', 'ForeignAwait'];
+
+var idbDomErrorNames = ['Unknown', 'Constraint', 'Data', 'TransactionInactive', 'ReadOnly', 'Version', 'NotFound', 'InvalidState', 'InvalidAccess', 'Abort', 'Timeout', 'QuotaExceeded', 'Syntax', 'DataClone'];
+
+var errorList = dexieErrorNames.concat(idbDomErrorNames);
+
+var defaultTexts = {
+    VersionChanged: "Database version changed by other database connection",
+    DatabaseClosed: "Database has been closed",
+    Abort: "Transaction aborted",
+    TransactionInactive: "Transaction has already completed or failed"
+};
+
+//
+// DexieError - base class of all out exceptions.
+//
+function DexieError(name, msg) {
+    // Reason we don't use ES6 classes is because:
+    // 1. It bloats transpiled code and increases size of minified code.
+    // 2. It doesn't give us much in this case.
+    // 3. It would require sub classes to call super(), which
+    //    is not needed when deriving from Error.
+    this._e = getErrorWithStack();
+    this.name = name;
+    this.message = msg;
+}
+
+derive(DexieError).from(Error).extend({
+    stack: {
+        get: function () {
+            return this._stack || (this._stack = this.name + ": " + this.message + prettyStack(this._e, 2));
+        }
+    },
+    toString: function () {
+        return this.name + ": " + this.message;
+    }
+});
+
+function getMultiErrorMessage(msg, failures) {
+    return msg + ". Errors: " + failures.map(function (f) {
+        return f.toString();
+    }).filter(function (v, i, s) {
+        return s.indexOf(v) === i;
+    }) // Only unique error strings
+    .join('\n');
+}
+
+//
+// ModifyError - thrown in Collection.modify()
+// Specific constructor because it contains members failures and failedKeys.
+//
+function ModifyError(msg, failures, successCount, failedKeys) {
+    this._e = getErrorWithStack();
+    this.failures = failures;
+    this.failedKeys = failedKeys;
+    this.successCount = successCount;
+}
+derive(ModifyError).from(DexieError);
+
+function BulkError(msg, failures) {
+    this._e = getErrorWithStack();
+    this.name = "BulkError";
+    this.failures = failures;
+    this.message = getMultiErrorMessage(msg, failures);
+}
+derive(BulkError).from(DexieError);
+
+//
+//
+// Dynamically generate error names and exception classes based
+// on the names in errorList.
+//
+//
+
+// Map of {ErrorName -> ErrorName + "Error"}
+var errnames = errorList.reduce(function (obj, name) {
+    return obj[name] = name + "Error", obj;
+}, {});
+
+// Need an alias for DexieError because we're gonna create subclasses with the same name.
+var BaseException = DexieError;
+// Map of {ErrorName -> exception constructor}
+var exceptions = errorList.reduce(function (obj, name) {
+    // Let the name be "DexieError" because this name may
+    // be shown in call stack and when debugging. DexieError is
+    // the most true name because it derives from DexieError,
+    // and we cannot change Function.name programatically without
+    // dynamically create a Function object, which would be considered
+    // 'eval-evil'.
+    var fullName = name + "Error";
+    function DexieError(msgOrInner, inner) {
+        this._e = getErrorWithStack();
+        this.name = fullName;
+        if (!msgOrInner) {
+            this.message = defaultTexts[name] || fullName;
+            this.inner = null;
+        } else if (typeof msgOrInner === 'string') {
+            this.message = msgOrInner;
+            this.inner = inner || null;
+        } else if (typeof msgOrInner === 'object') {
+            this.message = msgOrInner.name + ' ' + msgOrInner.message;
+            this.inner = msgOrInner;
+        }
+    }
+    derive(DexieError).from(BaseException);
+    obj[name] = DexieError;
+    return obj;
+}, {});
+
+// Use ECMASCRIPT standard exceptions where applicable:
+exceptions.Syntax = SyntaxError;
+exceptions.Type = TypeError;
+exceptions.Range = RangeError;
+
+var exceptionMap = idbDomErrorNames.reduce(function (obj, name) {
+    obj[name + "Error"] = exceptions[name];
+    return obj;
+}, {});
+
+function mapError(domError, message) {
+    if (!domError || domError instanceof DexieError || domError instanceof TypeError || domError instanceof SyntaxError || !domError.name || !exceptionMap[domError.name]) return domError;
+    var rv = new exceptionMap[domError.name](message || domError.message, domError);
+    if ("stack" in domError) {
+        // Derive stack from inner exception if it has a stack
+        setProp(rv, "stack", { get: function () {
+                return this.inner.stack;
+            } });
+    }
+    return rv;
+}
+
+var fullNameExceptions = errorList.reduce(function (obj, name) {
+    if (["Syntax", "Type", "Range"].indexOf(name) === -1) obj[name + "Error"] = exceptions[name];
+    return obj;
+}, {});
+
+fullNameExceptions.ModifyError = ModifyError;
+fullNameExceptions.DexieError = DexieError;
+fullNameExceptions.BulkError = BulkError;
+
 function nop() {}
 function mirror(val) {
     return val;
@@ -371,296 +564,23 @@ function promisableChain(f1, f2) {
     };
 }
 
-// By default, debug will be true only if platform is a web platform and its page is served from localhost.
-// When debug = true, error's stacks will contain asyncronic long stacks.
-var debug = typeof location !== 'undefined' &&
-// By default, use debug mode if served from localhost.
-/^(http|https):\/\/(localhost|127\.0\.0\.1)/.test(location.href);
-
-function setDebug(value, filter) {
-    debug = value;
-    libraryFilter = filter;
-}
-
-var libraryFilter = function () {
-    return true;
-};
-
-var NEEDS_THROW_FOR_STACK = !new Error("").stack;
-
-function getErrorWithStack() {
-    "use strict";
-
-    if (NEEDS_THROW_FOR_STACK) try {
-        // Doing something naughty in strict mode here to trigger a specific error
-        // that can be explicitely ignored in debugger's exception settings.
-        // If we'd just throw new Error() here, IE's debugger's exception settings
-        // will just consider it as "exception thrown by javascript code" which is
-        // something you wouldn't want it to ignore.
-        getErrorWithStack.arguments;
-        throw new Error(); // Fallback if above line don't throw.
-    } catch (e) {
-        return e;
-    }
-    return new Error();
-}
-
-function prettyStack(exception, numIgnoredFrames) {
-    var stack = exception.stack;
-    if (!stack) return "";
-    numIgnoredFrames = numIgnoredFrames || 0;
-    if (stack.indexOf(exception.name) === 0) numIgnoredFrames += (exception.name + exception.message).split('\n').length;
-    return stack.split('\n').slice(numIgnoredFrames).filter(libraryFilter).map(function (frame) {
-        return "\n" + frame;
-    }).join('');
-}
-
-function deprecated(what, fn) {
-    return function () {
-        console.warn(what + " is deprecated. See https://github.com/dfahlander/Dexie.js/wiki/Deprecations. " + prettyStack(getErrorWithStack(), 1));
-        return fn.apply(this, arguments);
-    };
-}
-
-var dexieErrorNames = ['Modify', 'Bulk', 'OpenFailed', 'VersionChange', 'Schema', 'Upgrade', 'InvalidTable', 'MissingAPI', 'NoSuchDatabase', 'InvalidArgument', 'SubTransaction', 'Unsupported', 'Internal', 'DatabaseClosed', 'IncompatiblePromise'];
-
-var idbDomErrorNames = ['Unknown', 'Constraint', 'Data', 'TransactionInactive', 'ReadOnly', 'Version', 'NotFound', 'InvalidState', 'InvalidAccess', 'Abort', 'Timeout', 'QuotaExceeded', 'Syntax', 'DataClone'];
-
-var errorList = dexieErrorNames.concat(idbDomErrorNames);
-
-var defaultTexts = {
-    VersionChanged: "Database version changed by other database connection",
-    DatabaseClosed: "Database has been closed",
-    Abort: "Transaction aborted",
-    TransactionInactive: "Transaction has already completed or failed"
-};
-
 //
-// DexieError - base class of all out exceptions.
-//
-function DexieError(name, msg) {
-    // Reason we don't use ES6 classes is because:
-    // 1. It bloats transpiled code and increases size of minified code.
-    // 2. It doesn't give us much in this case.
-    // 3. It would require sub classes to call super(), which
-    //    is not needed when deriving from Error.
-    this._e = getErrorWithStack();
-    this.name = name;
-    this.message = msg;
-}
-
-derive(DexieError).from(Error).extend({
-    stack: {
-        get: function () {
-            return this._stack || (this._stack = this.name + ": " + this.message + prettyStack(this._e, 2));
-        }
-    },
-    toString: function () {
-        return this.name + ": " + this.message;
-    }
-});
-
-function getMultiErrorMessage(msg, failures) {
-    return msg + ". Errors: " + failures.map(function (f) {
-        return f.toString();
-    }).filter(function (v, i, s) {
-        return s.indexOf(v) === i;
-    }) // Only unique error strings
-    .join('\n');
-}
-
-//
-// ModifyError - thrown in WriteableCollection.modify()
-// Specific constructor because it contains members failures and failedKeys.
-//
-function ModifyError(msg, failures, successCount, failedKeys) {
-    this._e = getErrorWithStack();
-    this.failures = failures;
-    this.failedKeys = failedKeys;
-    this.successCount = successCount;
-}
-derive(ModifyError).from(DexieError);
-
-function BulkError(msg, failures) {
-    this._e = getErrorWithStack();
-    this.name = "BulkError";
-    this.failures = failures;
-    this.message = getMultiErrorMessage(msg, failures);
-}
-derive(BulkError).from(DexieError);
-
-//
-//
-// Dynamically generate error names and exception classes based
-// on the names in errorList.
-//
-//
-
-// Map of {ErrorName -> ErrorName + "Error"}
-var errnames = errorList.reduce(function (obj, name) {
-    return obj[name] = name + "Error", obj;
-}, {});
-
-// Need an alias for DexieError because we're gonna create subclasses with the same name.
-var BaseException = DexieError;
-// Map of {ErrorName -> exception constructor}
-var exceptions = errorList.reduce(function (obj, name) {
-    // Let the name be "DexieError" because this name may
-    // be shown in call stack and when debugging. DexieError is
-    // the most true name because it derives from DexieError,
-    // and we cannot change Function.name programatically without
-    // dynamically create a Function object, which would be considered
-    // 'eval-evil'.
-    var fullName = name + "Error";
-    function DexieError(msgOrInner, inner) {
-        this._e = getErrorWithStack();
-        this.name = fullName;
-        if (!msgOrInner) {
-            this.message = defaultTexts[name] || fullName;
-            this.inner = null;
-        } else if (typeof msgOrInner === 'string') {
-            this.message = msgOrInner;
-            this.inner = inner || null;
-        } else if (typeof msgOrInner === 'object') {
-            this.message = msgOrInner.name + ' ' + msgOrInner.message;
-            this.inner = msgOrInner;
-        }
-    }
-    derive(DexieError).from(BaseException);
-    obj[name] = DexieError;
-    return obj;
-}, {});
-
-// Use ECMASCRIPT standard exceptions where applicable:
-exceptions.Syntax = SyntaxError;
-exceptions.Type = TypeError;
-exceptions.Range = RangeError;
-
-var exceptionMap = idbDomErrorNames.reduce(function (obj, name) {
-    obj[name + "Error"] = exceptions[name];
-    return obj;
-}, {});
-
-function mapError(domError, message) {
-    if (!domError || domError instanceof DexieError || domError instanceof TypeError || domError instanceof SyntaxError || !domError.name || !exceptionMap[domError.name]) return domError;
-    var rv = new exceptionMap[domError.name](message || domError.message, domError);
-    if ("stack" in domError) {
-        // Derive stack from inner exception if it has a stack
-        setProp(rv, "stack", { get: function () {
-                return this.inner.stack;
-            } });
-    }
-    return rv;
-}
-
-var fullNameExceptions = errorList.reduce(function (obj, name) {
-    if (["Syntax", "Type", "Range"].indexOf(name) === -1) obj[name + "Error"] = exceptions[name];
-    return obj;
-}, {});
-
-fullNameExceptions.ModifyError = ModifyError;
-fullNameExceptions.DexieError = DexieError;
-fullNameExceptions.BulkError = BulkError;
-
-function Events(ctx) {
-    var evs = {};
-    var rv = function (eventName, subscriber) {
-        if (subscriber) {
-            // Subscribe. If additional arguments than just the subscriber was provided, forward them as well.
-            var i = arguments.length,
-                args = new Array(i - 1);
-            while (--i) {
-                args[i - 1] = arguments[i];
-            }evs[eventName].subscribe.apply(null, args);
-            return ctx;
-        } else if (typeof eventName === 'string') {
-            // Return interface allowing to fire or unsubscribe from event
-            return evs[eventName];
-        }
-    };
-    rv.addEventType = add;
-
-    for (var i = 1, l = arguments.length; i < l; ++i) {
-        add(arguments[i]);
-    }
-
-    return rv;
-
-    function add(eventName, chainFunction, defaultFunction) {
-        if (typeof eventName === 'object') return addConfiguredEvents(eventName);
-        if (!chainFunction) chainFunction = reverseStoppableEventChain;
-        if (!defaultFunction) defaultFunction = nop;
-
-        var context = {
-            subscribers: [],
-            fire: defaultFunction,
-            subscribe: function (cb) {
-                if (context.subscribers.indexOf(cb) === -1) {
-                    context.subscribers.push(cb);
-                    context.fire = chainFunction(context.fire, cb);
-                }
-            },
-            unsubscribe: function (cb) {
-                context.subscribers = context.subscribers.filter(function (fn) {
-                    return fn !== cb;
-                });
-                context.fire = context.subscribers.reduce(chainFunction, defaultFunction);
-            }
-        };
-        evs[eventName] = rv[eventName] = context;
-        return context;
-    }
-
-    function addConfiguredEvents(cfg) {
-        // events(this, {reading: [functionChain, nop]});
-        keys(cfg).forEach(function (eventName) {
-            var args = cfg[eventName];
-            if (isArray(args)) {
-                add(eventName, cfg[eventName][0], cfg[eventName][1]);
-            } else if (args === 'asap') {
-                // Rather than approaching event subscription using a functional approach, we here do it in a for-loop where subscriber is executed in its own stack
-                // enabling that any exception that occur wont disturb the initiator and also not nescessary be catched and forgotten.
-                var context = add(eventName, mirror, function fire() {
-                    // Optimazation-safe cloning of arguments into args.
-                    var i = arguments.length,
-                        args = new Array(i);
-                    while (i--) {
-                        args[i] = arguments[i];
-                    } // All each subscriber:
-                    context.subscribers.forEach(function (fn) {
-                        asap(function fireEvent() {
-                            fn.apply(null, args);
-                        });
-                    });
-                });
-            } else throw new exceptions.InvalidArgument("Invalid event config");
-        });
-    }
-}
-
-//
-// Promise Class for Dexie library
+// Promise and Zone (PSD) for Dexie library
 //
 // I started out writing this Promise class by copying promise-light (https://github.com/taylorhakes/promise-light) by
 // https://github.com/taylorhakes - an A+ and ECMASCRIPT 6 compliant Promise implementation.
 //
-// Modifications needed to be done to support indexedDB because it wont accept setTimeout()
-// (See discussion: https://github.com/promises-aplus/promises-spec/issues/45) .
-// This topic was also discussed in the following thread: https://github.com/promises-aplus/promises-spec/issues/45
-//
-// This implementation will not use setTimeout or setImmediate when it's not needed. The behavior is 100% Promise/A+ compliant since
-// the caller of new Promise() can be certain that the promise wont be triggered the lines after constructing the promise.
-//
 // In previous versions this was fixed by not calling setTimeout when knowing that the resolve() or reject() came from another
 // tick. In Dexie v1.4.0, I've rewritten the Promise class entirely. Just some fragments of promise-light is left. I use
-// another strategy now that simplifies everything a lot: to always execute callbacks in a new tick, but have an own microTick
-// engine that is used instead of setImmediate() or setTimeout().
+// another strategy now that simplifies everything a lot: to always execute callbacks in a new micro-task, but have an own micro-task
+// engine that is indexedDB compliant across all browsers.
 // Promise class has also been optimized a lot with inspiration from bluebird - to avoid closures as much as possible.
 // Also with inspiration from bluebird, asyncronic stacks in debug mode.
 //
 // Specific non-standard features of this Promise class:
-// * Async static context support (Promise.PSD)
-// * Promise.follow() method built upon PSD, that allows user to track all promises created from current stack frame
+// * Custom zone support (a.k.a. PSD) with ability to keep zones also when using native promises as well as
+//   native async / await.
+// * Promise.follow() method built upon the custom zone engine, that allows user to track all promises created from current stack frame
 //   and below + all promises that those promises creates or awaits.
 // * Detect any unhandled promise in a PSD-scope (PSD.onunhandled). 
 //
@@ -674,16 +594,36 @@ var INTERNAL = {};
 // Async stacks (long stacks) must not grow infinitely.
 var LONG_STACKS_CLIP_LIMIT = 100;
 var MAX_LONG_STACKS = 20;
+var ZONE_ECHO_LIMIT = 7;
+var nativePromiseInstanceAndProto = function () {
+    try {
+        // Be able to patch native async functions
+        return new Function('let F=async ()=>{},p=F();return [p,Object.getPrototypeOf(p),Promise.resolve(),F.constructor];')();
+    } catch (e) {
+        var P = _global.Promise;
+        return P ? [P.resolve(), P.prototype, P.resolve()] : [];
+    }
+}();
+var resolvedNativePromise = nativePromiseInstanceAndProto[0];
+var nativePromiseProto = nativePromiseInstanceAndProto[1];
+var resolvedGlobalPromise = nativePromiseInstanceAndProto[2];
+var nativePromiseThen = nativePromiseProto && nativePromiseProto.then;
+
+var NativePromise = resolvedNativePromise && resolvedNativePromise.constructor;
+var AsyncFunction = nativePromiseInstanceAndProto[3];
+
 var stack_being_generated = false;
 
-/* The default "nextTick" function used only for the very first promise in a promise chain.
+/* The default function used only for the very first promise in a promise chain.
    As soon as then promise is resolved or rejected, all next tasks will be executed in micro ticks
    emulated in this module. For indexedDB compatibility, this means that every method needs to 
    execute at least one promise before doing an indexedDB operation. Dexie will always call 
    db.ready().then() for every operation to make sure the indexedDB event is started in an
-   emulated micro tick.
+   indexedDB-compatible emulated micro task loop.
 */
-var schedulePhysicalTick = _global.setImmediate ?
+var schedulePhysicalTick = resolvedGlobalPromise ? function () {
+    resolvedGlobalPromise.then(physicalTick);
+} : _global.setImmediate ?
 // setImmediate supported. Those modern platforms also supports Function.bind().
 setImmediate.bind(null, physicalTick) : _global.MutationObserver ?
 // MutationObserver supported
@@ -702,11 +642,11 @@ function () {
     setTimeout(physicalTick, 0);
 };
 
-// Confifurable through Promise.scheduler.
+// Configurable through Promise.scheduler.
 // Don't export because it would be unsafe to let unknown
 // code call it unless they do try..catch within their callback.
 // This function can be retrieved through getter of Promise.scheduler though,
-// but users must not do Promise.scheduler (myFuncThatThrows exception)!
+// but users must not do Promise.scheduler = myFuncThatThrowsException
 var asap$1 = function (callback, args) {
     microtickQueue.push([callback, args]);
     if (needsNewPhysicalTick) {
@@ -723,11 +663,13 @@ var currentFulfiller = null;
 var rejectionMapper = mirror; // Remove in next major when removing error mapping of DOMErrors and DOMExceptions
 
 var globalPSD = {
+    id: 'global',
     global: true,
     ref: 0,
     unhandleds: [],
     onunhandled: globalError,
-    //env: null, // Will be set whenever leaving a scope using wrappers.snapshot()
+    pgp: false,
+    env: {},
     finalize: function () {
         this.unhandleds.forEach(function (uh) {
             try {
@@ -742,30 +684,6 @@ var PSD = globalPSD;
 var microtickQueue = []; // Callbacks to call in this or next physical tick.
 var numScheduledCalls = 0; // Number of listener-calls left to do in this physical tick.
 var tickFinalizers = []; // Finalizers to call when there are no more async calls scheduled within current physical tick.
-
-// Wrappers are not being used yet. Their framework is functioning and can be used
-// to replace environment during a PSD scope (a.k.a. 'zone').
-/* **KEEP** export var wrappers = (() => {
-    var wrappers = [];
-
-    return {
-        snapshot: () => {
-            var i = wrappers.length,
-                result = new Array(i);
-            while (i--) result[i] = wrappers[i].snapshot();
-            return result;
-        },
-        restore: values => {
-            var i = wrappers.length;
-            while (i--) wrappers[i].restore(values[i]);
-        },
-        wrap: () => wrappers.map(w => w.wrap()),
-        add: wrapper => {
-            wrappers.push(wrapper);
-        }
-    };
-})();
-*/
 
 function Promise(fn) {
     if (typeof this !== 'object') throw new TypeError('Promises must be constructed via new');
@@ -805,21 +723,46 @@ function Promise(fn) {
     executePromiseTask(this, fn);
 }
 
-props(Promise.prototype, {
+// Prepare a property descriptor to put onto Promise.prototype.then
+var thenProp = {
+    get: function () {
+        var psd = PSD,
+            microTaskId = totalEchoes;
 
-    then: function (onFulfilled, onRejected) {
-        var _this = this;
+        function then(onFulfilled, onRejected) {
+            var _this = this;
 
-        var rv = new Promise(function (resolve, reject) {
-            propagateToListener(_this, new Listener(onFulfilled, onRejected, resolve, reject));
-        });
-        debug && (!this._prev || this._state === null) && linkToPreviousPromise(rv, this);
-        return rv;
+            var possibleAwait = !psd.global && (psd !== PSD || microTaskId !== totalEchoes);
+            if (possibleAwait) decrementExpectedAwaits();
+            var rv = new Promise(function (resolve, reject) {
+                propagateToListener(_this, new Listener(nativeAwaitCompatibleWrap(onFulfilled, psd, possibleAwait), nativeAwaitCompatibleWrap(onRejected, psd, possibleAwait), resolve, reject, psd));
+            });
+            debug && (!this._prev || this._state === null) && linkToPreviousPromise(rv, this);
+            return rv;
+        }
+
+        then._tQzo = true; // For idempotense, see setter below.
+
+        return then;
     },
+    // Be idempotent and allow another framework (such as zone.js or another instance of a Dexie.Promise module) to replace Promise.prototype.then
+    // and when that framework wants to restore the original property, we must identify that and restore the original property descriptor.
+    set: function (value) {
+        setProp(this, 'then', value && value._tQzo ? thenProp : // Restore to original property descriptor.
+        {
+            get: function () {
+                return value; // Getter returning provided value (behaves like value is just changed)
+            },
+            set: thenProp.set // Keep a setter that is prepared to restore original.
+        });
+    }
+};
 
+props(Promise.prototype, {
+    then: thenProp, // Defined above.
     _then: function (onFulfilled, onRejected) {
         // A little tinier version of then() that don't have to create a resulting promise.
-        propagateToListener(this, new Listener(null, null, onFulfilled, onRejected));
+        propagateToListener(this, new Listener(null, null, onFulfilled, onRejected, PSD));
     },
 
     catch: function (onRejected) {
@@ -853,26 +796,6 @@ props(Promise.prototype, {
         });
     },
 
-    // Deprecate in next major. Needed only for db.on.error.
-    uncaught: function (uncaughtHandler) {
-        var _this2 = this;
-
-        // Be backward compatible and use "onuncatched" as the event name on this.
-        // Handle multiple subscribers through reverseStoppableEventChain(). If a handler returns `false`, bubbling stops.
-        this.onuncatched = reverseStoppableEventChain(this.onuncatched, uncaughtHandler);
-        // In case caller does this on an already rejected promise, assume caller wants to point out the error to this promise and not
-        // a previous promise. Reason: the prevous promise may lack onuncatched handler. 
-        if (this._state === false && unhandledErrors.indexOf(this) === -1) {
-            // Replace unhandled error's destinaion promise with this one!
-            unhandledErrors.some(function (p, i, l) {
-                return p._value === _this2._value && (l[i] = _this2);
-            });
-            // Actually we do this shit because we need to support db.on.error() correctly during db.open(). If we deprecate db.on.error, we could
-            // take away this piece of code as well as the onuncatched and uncaught() method.
-        }
-        return this;
-    },
-
     stack: {
         get: function () {
             if (this._stack) return this._stack;
@@ -889,18 +812,23 @@ props(Promise.prototype, {
     }
 });
 
-function Listener(onFulfilled, onRejected, resolve, reject) {
+// Now that Promise.prototype is defined, we have all it takes to set globalPSD.env.
+// Environment globals snapshotted on leaving global zone
+globalPSD.env = snapShot();
+
+function Listener(onFulfilled, onRejected, resolve, reject, zone) {
     this.onFulfilled = typeof onFulfilled === 'function' ? onFulfilled : null;
     this.onRejected = typeof onRejected === 'function' ? onRejected : null;
     this.resolve = resolve;
     this.reject = reject;
-    this.psd = PSD;
+    this.psd = zone;
 }
 
 // Promise Static Properties
 props(Promise, {
     all: function () {
-        var values = getArrayOf.apply(null, arguments); // Supports iterables, implicit arguments and array-like.
+        var values = getArrayOf.apply(null, arguments) // Supports iterables, implicit arguments and array-like.
+        .map(onPossibleParallellAsync); // Handle parallell async/awaits 
         return new Promise(function (resolve, reject) {
             if (values.length === 0) resolve([]);
             var remaining = values.length;
@@ -924,7 +852,7 @@ props(Promise, {
     reject: PromiseReject,
 
     race: function () {
-        var values = getArrayOf.apply(null, arguments);
+        var values = getArrayOf.apply(null, arguments).map(onPossibleParallellAsync);
         return new Promise(function (resolve, reject) {
             values.map(function (value) {
                 return Promise.resolve(value).then(resolve, reject);
@@ -940,6 +868,10 @@ props(Promise, {
             return PSD = value;
         }
     },
+
+    //totalEchoes: {get: ()=>totalEchoes},
+
+    //task: {get: ()=>task},
 
     newPSD: newScope,
 
@@ -963,35 +895,27 @@ props(Promise, {
         } // Map reject failures
     },
 
-    follow: function (fn) {
+    follow: function (fn, zoneProps) {
         return new Promise(function (resolve, reject) {
             return newScope(function (resolve, reject) {
                 var psd = PSD;
                 psd.unhandleds = []; // For unhandled standard- or 3rd party Promises. Checked at psd.finalize()
                 psd.onunhandled = reject; // Triggered directly on unhandled promises of this library.
                 psd.finalize = callBoth(function () {
-                    var _this3 = this;
+                    var _this2 = this;
 
                     // Unhandled standard or 3rd part promises are put in PSD.unhandleds and
                     // examined upon scope completion while unhandled rejections in this Promise
                     // will trigger directly through psd.onunhandled
                     run_at_end_of_this_or_next_physical_tick(function () {
-                        _this3.unhandleds.length === 0 ? resolve() : reject(_this3.unhandleds[0]);
+                        _this2.unhandleds.length === 0 ? resolve() : reject(_this2.unhandleds[0]);
                     });
                 }, psd.finalize);
                 fn();
-            }, resolve, reject);
+            }, zoneProps, resolve, reject);
         });
-    },
-
-    on: Events(null, { "error": [reverseStoppableEventChain, defaultErrorHandler] // Default to defaultErrorHandler
-    })
-
+    }
 });
-
-var PromiseOnError = Promise.on.error;
-PromiseOnError.subscribe = deprecated("Promise.on('error')", PromiseOnError.subscribe);
-PromiseOnError.unsubscribe = deprecated("Promise.on('error').unsubscribe", PromiseOnError.unsubscribe);
 
 /**
 * Take a potentially misbehaving resolver function and make sure
@@ -1004,7 +928,7 @@ function executePromiseTask(promise, fn) {
     // https://github.com/promises-aplus/promises-spec#the-promise-resolution-procedure
     try {
         fn(function (value) {
-            if (promise._state !== null) return;
+            if (promise._state !== null) return; // Already settled
             if (value === promise) throw new TypeError('A promise cannot be resolved with itself.');
             var shouldExecuteTick = promise._lib && beginMicroTickScope();
             if (value && typeof value.then === 'function') {
@@ -1078,32 +1002,26 @@ function propagateToListener(promise, listener) {
         // This Listener doesnt have a listener for the event being triggered (onFulfilled or onReject) so lets forward the event to any eventual listeners on the Promise instance returned by then() or catch()
         return (promise._state ? listener.resolve : listener.reject)(promise._value);
     }
-    var psd = listener.psd;
-    ++psd.ref;
+    ++listener.psd.ref;
     ++numScheduledCalls;
     asap$1(callListener, [cb, promise, listener]);
 }
 
 function callListener(cb, promise, listener) {
-    var outerScope = PSD;
-    var psd = listener.psd;
     try {
-        if (psd !== outerScope) {
-            // **KEEP** outerScope.env = wrappers.snapshot(); // Snapshot outerScope's environment.
-            PSD = psd;
-            // **KEEP** wrappers.restore(psd.env); // Restore PSD's environment.
-        }
-
         // Set static variable currentFulfiller to the promise that is being fullfilled,
         // so that we connect the chain of promises (for long stacks support)
         currentFulfiller = promise;
 
         // Call callback and resolve our listener with it's return value.
-        var value = promise._value,
-            ret;
+        var ret,
+            value = promise._value;
+
         if (promise._state) {
+            // cb is onResolved
             ret = cb(value);
         } else {
+            // cb is onRejected
             if (rejectingErrors.length) rejectingErrors = [];
             ret = cb(value);
             if (rejectingErrors.indexOf(value) === -1) markErrorAsHandled(promise); // Callback didnt do Promise.reject(err) nor reject(err) onto another promise.
@@ -1113,14 +1031,10 @@ function callListener(cb, promise, listener) {
         // Exception thrown in callback. Reject our listener.
         listener.reject(e);
     } finally {
-        // Restore PSD, env and currentFulfiller.
-        if (psd !== outerScope) {
-            PSD = outerScope;
-            // **KEEP** wrappers.restore(outerScope.env); // Restore outerScope's environment
-        }
+        // Restore env and currentFulfiller.
         currentFulfiller = null;
         if (--numScheduledCalls === 0) finalizePhysicalTick();
-        --psd.ref || psd.finalize();
+        --listener.psd.ref || listener.psd.finalize();
     }
 }
 
@@ -1248,11 +1162,6 @@ function markErrorAsHandled(promise) {
     }
 }
 
-// By default, log uncaught errors to the console
-function defaultErrorHandler(e) {
-    console.warn('Unhandled rejection: ' + (e.stack || e));
-}
-
 function PromiseReject(reason) {
     return new Promise(INTERNAL, false, reason);
 }
@@ -1264,31 +1173,47 @@ function wrap(fn, errorCatcher) {
             outerScope = PSD;
 
         try {
-            if (outerScope !== psd) {
-                // **KEEP** outerScope.env = wrappers.snapshot(); // Snapshot outerScope's environment
-                PSD = psd;
-                // **KEEP** wrappers.restore(psd.env); // Restore PSD's environment.
-            }
+            switchToZone(psd, true);
             return fn.apply(this, arguments);
         } catch (e) {
             errorCatcher && errorCatcher(e);
         } finally {
-            if (outerScope !== psd) {
-                PSD = outerScope;
-                // **KEEP** wrappers.restore(outerScope.env); // Restore outerScope's environment
-            }
+            switchToZone(outerScope, false);
             if (wasRootExec) endMicroTickScope();
         }
     };
 }
 
-function newScope(fn, a1, a2, a3) {
+//
+// variables used for native await support
+//
+var task = { awaits: 0, echoes: 0, id: 0 }; // The ongoing macro-task when using zone-echoing.
+var taskCounter = 0; // ID counter for macro tasks.
+var zoneStack = []; // Stack of left zones to restore asynchronically.
+var zoneEchoes = 0; // zoneEchoes is a must in order to persist zones between native await expressions.
+var totalEchoes = 0; // ID counter for micro-tasks. Used to detect possible native await in our Promise.prototype.then.
+
+
+var zone_id_counter = 0;
+function newScope(fn, props$$1, a1, a2) {
     var parent = PSD,
         psd = Object.create(parent);
     psd.parent = parent;
     psd.ref = 0;
     psd.global = false;
-    // **KEEP** psd.env = wrappers.wrap(psd);
+    psd.id = ++zone_id_counter;
+    // Prepare for promise patching (done in usePSD):
+    var globalEnv = globalPSD.env;
+    psd.env = nativePromiseThen ? {
+        Promise: Promise, // Changing window.Promise could be omitted for Chrome and Edge, where IDB+Promise plays well!
+        all: Promise.all,
+        race: Promise.race,
+        resolve: Promise.resolve,
+        reject: Promise.reject,
+        nthen: getPatchedPromiseThen(globalEnv.nthen, psd), // native then
+        gthen: getPatchedPromiseThen(globalEnv.gthen, psd) // global then
+    } : {};
+    if (props$$1) extend(psd, props$$1);
 
     // unhandleds and onunhandled should not be specifically set here.
     // Leave them on parent prototype.
@@ -1298,26 +1223,147 @@ function newScope(fn, a1, a2, a3) {
     psd.finalize = function () {
         --this.parent.ref || this.parent.finalize();
     };
-    var rv = usePSD(psd, fn, a1, a2, a3);
+    var rv = usePSD(psd, fn, a1, a2);
     if (psd.ref === 0) psd.finalize();
     return rv;
+}
+
+// Function to call if scopeFunc returns NativePromise
+// Also for each NativePromise in the arguments to Promise.all()
+function incrementExpectedAwaits() {
+    if (!task.id) task.id = ++taskCounter;
+    ++task.awaits;
+    task.echoes += ZONE_ECHO_LIMIT;
+    return task.id;
+}
+// Function to call when 'then' calls back on a native promise where onAwaitExpected() had been called.
+// Also call this when a native await calls then method on a promise. In that case, don't supply
+// sourceTaskId because we already know it refers to current task.
+function decrementExpectedAwaits(sourceTaskId) {
+    if (!task.awaits || sourceTaskId && sourceTaskId !== task.id) return;
+    if (--task.awaits === 0) task.id = 0;
+    task.echoes = task.awaits * ZONE_ECHO_LIMIT; // Will reset echoes to 0 if awaits is 0.
+}
+
+// Call from Promise.all() and Promise.race()
+function onPossibleParallellAsync(possiblePromise) {
+    if (task.echoes && possiblePromise && possiblePromise.constructor === NativePromise) {
+        incrementExpectedAwaits();
+        return possiblePromise.then(function (x) {
+            decrementExpectedAwaits();
+            return x;
+        }, function (e) {
+            decrementExpectedAwaits();
+            return rejection(e);
+        });
+    }
+    return possiblePromise;
+}
+
+function zoneEnterEcho(targetZone) {
+    ++totalEchoes;
+    if (!task.echoes || --task.echoes === 0) {
+        task.echoes = task.id = 0; // Cancel zone echoing.
+    }
+
+    zoneStack.push(PSD);
+    switchToZone(targetZone, true);
+}
+
+function zoneLeaveEcho() {
+    var zone = zoneStack[zoneStack.length - 1];
+    zoneStack.pop();
+    switchToZone(zone, false);
+}
+
+function switchToZone(targetZone, bEnteringZone) {
+    var currentZone = PSD;
+    if (bEnteringZone ? task.echoes && (!zoneEchoes++ || targetZone !== PSD) : zoneEchoes && (! --zoneEchoes || targetZone !== PSD)) {
+        // Enter or leave zone asynchronically as well, so that tasks initiated during current tick
+        // will be surrounded by the zone when they are invoked.
+        enqueueNativeMicroTask(bEnteringZone ? zoneEnterEcho.bind(null, targetZone) : zoneLeaveEcho);
+    }
+    if (targetZone === PSD) return;
+
+    PSD = targetZone; // The actual zone switch occurs at this line.
+
+    // Snapshot on every leave from global zone.
+    if (currentZone === globalPSD) globalPSD.env = snapShot();
+
+    var GlobalPromise = globalPSD.env.Promise;
+    if (GlobalPromise) {
+        // Global environment has a promise at this time. Polyfilled or not. Let's patch the global environment.
+        // Swich environments (may be PSD-zone or the global zone. Both apply.)
+        var targetEnv = targetZone.env;
+
+        // Change Promise.prototype.then for native and global Promise (they MAY differ on polyfilled environments, but both can be accessed)
+        // Must be done on each zone change because the patched method contains targetZone in its closure.
+        nativePromiseProto.then = targetEnv.nthen;
+        GlobalPromise.prototype.then = targetEnv.gthen;
+
+        if (currentZone.global || targetZone.global) {
+            // Leaving or entering global zone. It's time to patch / restore global Promise.
+
+            // Set this Promise to window.Promise so that transiled async functions will work on Firefox, Safari and IE, as well as with Zonejs and angular.
+            _global.Promise = targetEnv.Promise;
+
+            // Support Promise.all() etc to work indexedDB-safe also when people are including es6-promise as a module (they might
+            // not be accessing global.Promise but a local reference to it)
+            GlobalPromise.all = targetEnv.all;
+            GlobalPromise.race = targetEnv.race;
+            GlobalPromise.resolve = targetEnv.resolve;
+            GlobalPromise.reject = targetEnv.reject;
+        }
+    }
+}
+
+function snapShot() {
+    var GlobalPromise = _global.Promise;
+    return GlobalPromise ? {
+        Promise: GlobalPromise,
+        all: GlobalPromise.all,
+        race: GlobalPromise.race,
+        resolve: GlobalPromise.resolve,
+        reject: GlobalPromise.reject,
+        nthen: nativePromiseProto.then,
+        gthen: GlobalPromise.prototype.then
+    } : {};
 }
 
 function usePSD(psd, fn, a1, a2, a3) {
     var outerScope = PSD;
     try {
-        if (psd !== outerScope) {
-            // **KEEP** outerScope.env = wrappers.snapshot(); // snapshot outerScope's environment.
-            PSD = psd;
-            // **KEEP** wrappers.restore(psd.env); // Restore PSD's environment.
-        }
+        switchToZone(psd, true);
         return fn(a1, a2, a3);
     } finally {
-        if (psd !== outerScope) {
-            PSD = outerScope;
-            // **KEEP** wrappers.restore(outerScope.env); // Restore outerScope's environment.
-        }
+        switchToZone(outerScope, false);
     }
+}
+
+function enqueueNativeMicroTask(job) {
+    //
+    // Precondition: nativePromiseThen !== undefined
+    //
+    nativePromiseThen.call(resolvedNativePromise, job);
+}
+
+function nativeAwaitCompatibleWrap(fn, zone, possibleAwait) {
+    return typeof fn !== 'function' ? fn : function () {
+        var outerZone = PSD;
+        if (possibleAwait) incrementExpectedAwaits();
+        switchToZone(zone, true);
+        try {
+            return fn.apply(this, arguments);
+        } finally {
+            switchToZone(outerZone, false);
+        }
+    };
+}
+
+function getPatchedPromiseThen(origThen, zone) {
+    return function (onResolved, onRejected) {
+        return origThen.call(this, nativeAwaitCompatibleWrap(onResolved, zone, false), nativeAwaitCompatibleWrap(onRejected, zone, false));
+    };
 }
 
 var UNHANDLEDREJECTION = "unhandledrejection";
@@ -1347,64 +1393,10 @@ function globalError(err, promise) {
                 } catch (_) {}
         }
         if (!event.defaultPrevented) {
-            // Backward compatibility: fire to events registered at Promise.on.error
-            Promise.on.error.fire(err, promise);
+            console.warn('Unhandled rejection: ' + (err.stack || err));
         }
     } catch (e) {}
 }
-
-/* **KEEP** 
-
-export function wrapPromise(PromiseClass) {
-    var proto = PromiseClass.prototype;
-    var origThen = proto.then;
-    
-    wrappers.add({
-        snapshot: () => proto.then,
-        restore: value => {proto.then = value;},
-        wrap: () => patchedThen
-    });
-
-    function patchedThen (onFulfilled, onRejected) {
-        var promise = this;
-        var onFulfilledProxy = wrap(function(value){
-            var rv = value;
-            if (onFulfilled) {
-                rv = onFulfilled(rv);
-                if (rv && typeof rv.then === 'function') rv.then(); // Intercept that promise as well.
-            }
-            --PSD.ref || PSD.finalize();
-            return rv;
-        });
-        var onRejectedProxy = wrap(function(err){
-            promise._$err = err;
-            var unhandleds = PSD.unhandleds;
-            var idx = unhandleds.length,
-                rv;
-            while (idx--) if (unhandleds[idx]._$err === err) break;
-            if (onRejected) {
-                if (idx !== -1) unhandleds.splice(idx, 1); // Mark as handled.
-                rv = onRejected(err);
-                if (rv && typeof rv.then === 'function') rv.then(); // Intercept that promise as well.
-            } else {
-                if (idx === -1) unhandleds.push(promise);
-                rv = PromiseClass.reject(err);
-                rv._$nointercept = true; // Prohibit eternal loop.
-            }
-            --PSD.ref || PSD.finalize();
-            return rv;
-        });
-        
-        if (this._$nointercept) return origThen.apply(this, arguments);
-        ++PSD.ref;
-        return origThen.call(this, onFulfilledProxy, onRejectedProxy);
-    }
-}
-
-// Global Promise wrapper
-if (_global.Promise) wrapPromise(_global.Promise);
-
-*/
 
 doFakeAutoComplete(function () {
     // Simplify the job for VS Intellisense. This piece of code is one of the keys to the new marvellous intellisense support in Dexie.
@@ -1415,10 +1407,82 @@ doFakeAutoComplete(function () {
     };
 });
 
-function rejection(err, uncaughtHandler) {
-    // Get the call stack and return a rejected promise.
-    var rv = Promise.reject(err);
-    return uncaughtHandler ? rv.uncaught(uncaughtHandler) : rv;
+var rejection = Promise.reject;
+
+function Events(ctx) {
+    var evs = {};
+    var rv = function (eventName, subscriber) {
+        if (subscriber) {
+            // Subscribe. If additional arguments than just the subscriber was provided, forward them as well.
+            var i = arguments.length,
+                args = new Array(i - 1);
+            while (--i) {
+                args[i - 1] = arguments[i];
+            }evs[eventName].subscribe.apply(null, args);
+            return ctx;
+        } else if (typeof eventName === 'string') {
+            // Return interface allowing to fire or unsubscribe from event
+            return evs[eventName];
+        }
+    };
+    rv.addEventType = add;
+
+    for (var i = 1, l = arguments.length; i < l; ++i) {
+        add(arguments[i]);
+    }
+
+    return rv;
+
+    function add(eventName, chainFunction, defaultFunction) {
+        if (typeof eventName === 'object') return addConfiguredEvents(eventName);
+        if (!chainFunction) chainFunction = reverseStoppableEventChain;
+        if (!defaultFunction) defaultFunction = nop;
+
+        var context = {
+            subscribers: [],
+            fire: defaultFunction,
+            subscribe: function (cb) {
+                if (context.subscribers.indexOf(cb) === -1) {
+                    context.subscribers.push(cb);
+                    context.fire = chainFunction(context.fire, cb);
+                }
+            },
+            unsubscribe: function (cb) {
+                context.subscribers = context.subscribers.filter(function (fn) {
+                    return fn !== cb;
+                });
+                context.fire = context.subscribers.reduce(chainFunction, defaultFunction);
+            }
+        };
+        evs[eventName] = rv[eventName] = context;
+        return context;
+    }
+
+    function addConfiguredEvents(cfg) {
+        // events(this, {reading: [functionChain, nop]});
+        keys(cfg).forEach(function (eventName) {
+            var args = cfg[eventName];
+            if (isArray(args)) {
+                add(eventName, cfg[eventName][0], cfg[eventName][1]);
+            } else if (args === 'asap') {
+                // Rather than approaching event subscription using a functional approach, we here do it in a for-loop where subscriber is executed in its own stack
+                // enabling that any exception that occur wont disturb the initiator and also not nescessary be catched and forgotten.
+                var context = add(eventName, mirror, function fire() {
+                    // Optimazation-safe cloning of arguments into args.
+                    var i = arguments.length,
+                        args = new Array(i);
+                    while (i--) {
+                        args[i] = arguments[i];
+                    } // All each subscriber:
+                    context.subscribers.forEach(function (fn) {
+                        asap(function fireEvent() {
+                            fn.apply(null, args);
+                        });
+                    });
+                });
+            } else throw new exceptions.InvalidArgument("Invalid event config");
+        });
+    }
 }
 
 /*
@@ -1427,14 +1491,14 @@ function rejection(err, uncaughtHandler) {
  *
  * By David Fahlander, david.fahlander@gmail.com
  *
- * Version 1.5.1, Tue Nov 01 2016
+ * Version 2.0.0-beta.4, Tue Nov 01 2016
  *
  * http://dexie.org
  *
  * Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
  */
 
-var DEXIE_VERSION = '1.5.1';
+var DEXIE_VERSION = '2.0.0-beta.4';
 var maxString = String.fromCharCode(65535);
 var maxKey = function () {
     try {
@@ -1581,8 +1645,8 @@ function Dexie(dbName, options) {
             // Update the latest schema to this version
             // Update API
             globalSchema = db._dbSchema = dbschema;
-            removeTablesApi([allTables, db, Transaction.prototype]);
-            setApiOnPlace([allTables, db, Transaction.prototype, this._cfg.tables], keys(dbschema), READWRITE, dbschema);
+            removeTablesApi([allTables, db, Transaction.prototype]); // Keep Transaction.prototype even though it should be depr.
+            setApiOnPlace([allTables, db, Transaction.prototype, this._cfg.tables], keys(dbschema), dbschema);
             dbStoreNames = keys(dbschema);
             return this;
         },
@@ -1788,10 +1852,6 @@ function Dexie(dbName, options) {
         store.createIndex(idx.name, idx.keyPath, { unique: idx.unique, multiEntry: idx.multi });
     }
 
-    function dbUncaught(err) {
-        return db.on.error.fire(err);
-    }
-
     //
     //
     //      Dexie Protected API
@@ -1801,8 +1861,11 @@ function Dexie(dbName, options) {
     this._allTables = allTables;
 
     this._tableFactory = function createTable(mode, tableSchema) {
-        /// <param name="tableSchema" type="TableSchema"></param>
-        if (mode === READONLY) return new Table(tableSchema.name, tableSchema, Collection);else return new WriteableTable(tableSchema.name, tableSchema);
+        // Todo: This _tableFactory is meaningless as of Dexie 1.4, but it is used by
+        // Dexie.Observable to hook into CRUD operations. Should Change Dexie.Observable
+        // to use another strategy than overloading db._tableFactory. Then, we could
+        // also remove this method and instead just do new Table() where it is called upon.
+        return new Table(tableSchema.name, tableSchema);
     };
 
     this._createTransaction = function (mode, storeNames, dbschema, parentTransaction) {
@@ -1815,19 +1878,19 @@ function Dexie(dbName, options) {
         // Last argument is "writeLocked". But this doesnt apply to oneshot direct db operations, so we ignore it.
         if (!openComplete && !PSD.letThrough) {
             if (!isBeingOpened) {
-                if (!autoOpen) return rejection(new exceptions.DatabaseClosed(), dbUncaught);
+                if (!autoOpen) return rejection(new exceptions.DatabaseClosed());
                 db.open().catch(nop); // Open in background. If if fails, it will be catched by the final promise anyway.
             }
             return dbReadyPromise.then(function () {
                 return tempTransaction(mode, storeNames, fn);
             });
         } else {
-            var trans = db._createTransaction(mode, storeNames, globalSchema);
+            var trans = db._createTransaction(mode, storeNames, globalSchema).create();
             return trans._promise(mode, function (resolve, reject) {
-                newScope(function () {
+                return newScope(function () {
                     // OPTIMIZATION POSSIBLE? newScope() not needed because it's already done in _promise.
                     PSD.trans = trans;
-                    fn(resolve, reject, trans);
+                    return fn(resolve, reject, trans);
                 });
             }).then(function (result) {
                 // Instead of resolving value directly, wait with resolving it until transaction has completed.
@@ -1862,7 +1925,7 @@ function Dexie(dbName, options) {
             dbReadyPromise.then(function () {
                 fn(resolve, reject);
             });
-        }).uncaught(dbUncaught);
+        });
     };
 
     //
@@ -1878,7 +1941,7 @@ function Dexie(dbName, options) {
 
     this.open = function () {
         if (isBeingOpened || idbdb) return dbReadyPromise.then(function () {
-            return dbOpenError ? rejection(dbOpenError, dbUncaught) : db;
+            return dbOpenError ? rejection(dbOpenError) : db;
         });
         debug && (openCanceller._stackHolder = getErrorWithStack()); // Let stacks point to when open() was called rather than where new Dexie() was called.
         isBeingOpened = true;
@@ -1909,7 +1972,7 @@ function Dexie(dbName, options) {
 
             var req = autoSchema ? indexedDB.open(dbName) : indexedDB.open(dbName, Math.round(db.verno * 10));
             if (!req) throw new exceptions.MissingAPI("IndexedDB API not available"); // May happen in Safari private mode, see https://github.com/dfahlander/Dexie.js/issues/134
-            req.onerror = wrap(eventRejectHandler(reject));
+            req.onerror = eventRejectHandler(reject);
             req.onblocked = wrap(fireOnBlocked);
             req.onupgradeneeded = wrap(function (e) {
                 upgradeTransaction = req.transaction;
@@ -1927,7 +1990,7 @@ function Dexie(dbName, options) {
                         reject(new exceptions.NoSuchDatabase('Database ' + dbName + ' doesnt exist'));
                     });
                 } else {
-                    upgradeTransaction.onerror = wrap(eventRejectHandler(reject));
+                    upgradeTransaction.onerror = eventRejectHandler(reject);
                     var oldVer = e.oldVersion > Math.pow(2, 62) ? 0 : e.oldVersion; // Safari 8 fix.
                     runUpgraders(oldVer / 10, upgradeTransaction, reject, req);
                 }
@@ -1980,7 +2043,7 @@ function Dexie(dbName, options) {
             db.close(); // Closes and resets idbdb, removes connections, resets dbReadyPromise and openCanceller so that a later db.open() is fresh.
             // A call to db.close() may have made on-ready subscribers fail. Use dbOpenError if set, since err could be a follow-up error on that.
             dbOpenError = err; // Record the error. It will be used to reject further promises of db operations.
-            return rejection(dbOpenError, dbUncaught); // dbUncaught will make sure any error that happened in any operation before will now bubble to db.on.error() thanks to the special handling in Promise.uncaught().
+            return rejection(dbOpenError);
         }).finally(function () {
             openComplete = true;
             resolveDbReady(); // dbReadyPromise is resolved no matter if open() rejects or resolved. It's just to wake up waiters.
@@ -2029,10 +2092,10 @@ function Dexie(dbName, options) {
                     }
                     resolve();
                 });
-                req.onerror = wrap(eventRejectHandler(reject));
+                req.onerror = eventRejectHandler(reject);
                 req.onblocked = fireOnBlocked;
             }
-        }).uncaught(dbUncaught);
+        });
     };
 
     this.backendDB = function () {
@@ -2057,7 +2120,7 @@ function Dexie(dbName, options) {
     // db.tables - an array of all Table instances.
     setProp(this, "tables", {
         get: function () {
-            /// <returns type="Array" elementType="WriteableTable" />
+            /// <returns type="Array" elementType="Table" />
             return keys(allTables).map(function (name) {
                 return allTables[name];
             });
@@ -2067,9 +2130,7 @@ function Dexie(dbName, options) {
     //
     // Events
     //
-    this.on = Events(this, "error", "populate", "blocked", "versionchange", { ready: [promisableChain, nop] });
-    this.on.error.subscribe = deprecated("Dexie.on.error", this.on.error.subscribe);
-    this.on.error.unsubscribe = deprecated("Dexie.on.error.unsubscribe", this.on.error.unsubscribe);
+    this.on = Events(this, "populate", "blocked", "versionchange", { ready: [promisableChain, nop] });
 
     this.on.ready.subscribe = override(this.on.ready.subscribe, function (subscribe) {
         return function (subscriber, bSticky) {
@@ -2094,10 +2155,9 @@ function Dexie(dbName, options) {
 
     fakeAutoComplete(function () {
         db.on("populate").fire(db._createTransaction(READWRITE, dbStoreNames, globalSchema));
-        db.on("error").fire(new Error());
     });
 
-    this.transaction = function (mode, tableInstances, scopeFunc) {
+    this.transaction = function () {
         /// <summary>
         ///
         /// </summary>
@@ -2105,6 +2165,11 @@ function Dexie(dbName, options) {
         /// <param name="tableInstances">Table instance, Array of Table instances, String or String Array of object stores to include in the transaction</param>
         /// <param name="scopeFunc" type="Function">Function to execute with transaction</param>
 
+        var args = extractTransactionArgs.apply(this, arguments);
+        return this._transaction.apply(this, args);
+    };
+
+    function extractTransactionArgs(mode, _tableArgs_, scopeFunc) {
         // Let table arguments be all arguments between mode and last argument.
         var i = arguments.length;
         if (i < 2) throw new exceptions.InvalidArgument("Too few arguments");
@@ -2116,6 +2181,10 @@ function Dexie(dbName, options) {
         } // Let scopeFunc be the last argument and pop it so that args now only contain the table arguments.
         scopeFunc = args.pop();
         var tables = flatten(args); // Support using array as middle argument, or a mix of arrays and non-arrays.
+        return [mode, tables, scopeFunc];
+    }
+
+    this._transaction = function (mode, tables, scopeFunc) {
         var parentTransaction = PSD.trans;
         // Check if parent transactions is bound to this db instance, and if caller wants to reuse it
         if (!parentTransaction || parentTransaction.db !== db || mode.indexOf('!') !== -1) parentTransaction = null;
@@ -2159,7 +2228,7 @@ function Dexie(dbName, options) {
         } catch (e) {
             return parentTransaction ? parentTransaction._promise(null, function (_, reject) {
                 reject(e);
-            }) : rejection(e, dbUncaught);
+            }) : rejection(e);
         }
         // If this is a sub-transaction, lock the parent and then launch the sub-transaction.
         return parentTransaction ? parentTransaction._promise(mode, enterTransactionScope, "lock") : db._whenReady(enterTransactionScope);
@@ -2167,59 +2236,64 @@ function Dexie(dbName, options) {
         function enterTransactionScope(resolve) {
             var parentPSD = PSD;
             resolve(Promise.resolve().then(function () {
-                return newScope(function () {
-                    // Keep a pointer to last non-transactional PSD to use if someone calls Dexie.ignoreTransaction().
-                    PSD.transless = PSD.transless || parentPSD;
-                    // Our transaction.
-                    //return new Promise((resolve, reject) => {
-                    var trans = db._createTransaction(mode, storeNames, globalSchema, parentTransaction);
-                    // Let the transaction instance be part of a Promise-specific data (PSD) value.
-                    PSD.trans = trans;
+                // Keep a pointer to last non-transactional PSD to use if someone calls Dexie.ignoreTransaction().
+                var transless = PSD.transless || parentPSD;
+                // Our transaction.
+                //return new Promise((resolve, reject) => {
+                var trans = db._createTransaction(mode, storeNames, globalSchema, parentTransaction);
+                // Let the transaction instance be part of a Promise-specific data (PSD) value.
+                var zoneProps = {
+                    trans: trans,
+                    transless: transless
+                };
 
-                    if (parentTransaction) {
-                        // Emulate transaction commit awareness for inner transaction (must 'commit' when the inner transaction has no more operations ongoing)
-                        trans.idbtrans = parentTransaction.idbtrans;
-                    } else {
-                        trans.create(); // Create the backend transaction so that complete() or error() will trigger even if no operation is made upon it.
-                    }
+                if (parentTransaction) {
+                    // Emulate transaction commit awareness for inner transaction (must 'commit' when the inner transaction has no more operations ongoing)
+                    trans.idbtrans = parentTransaction.idbtrans;
+                } else {
+                    trans.create(); // Create the backend transaction so that complete() or error() will trigger even if no operation is made upon it.
+                }
 
-                    // Provide arguments to the scope function (for backward compatibility)
-                    var tableArgs = storeNames.map(function (name) {
-                        return allTables[name];
-                    });
-                    tableArgs.push(trans);
+                // Support for native async await.
+                if (scopeFunc.constructor === AsyncFunction) {
+                    incrementExpectedAwaits();
+                }
 
-                    var returnValue;
-                    return Promise.follow(function () {
-                        // Finally, call the scope function with our table and transaction arguments.
-                        returnValue = scopeFunc.apply(trans, tableArgs); // NOTE: returnValue is used in trans.on.complete() not as a returnValue to this func.
-                        if (returnValue) {
-                            if (typeof returnValue.next === 'function' && typeof returnValue.throw === 'function') {
-                                // scopeFunc returned an iterator with throw-support. Handle yield as await.
-                                returnValue = awaitIterator(returnValue);
-                            } else if (typeof returnValue.then === 'function' && !hasOwn(returnValue, '_PSD')) {
-                                throw new exceptions.IncompatiblePromise("Incompatible Promise returned from transaction scope (read more at http://tinyurl.com/znyqjqc). Transaction scope: " + scopeFunc.toString());
-                            }
+                var returnValue;
+                var promiseFollowed = Promise.follow(function () {
+                    // Finally, call the scope function with our table and transaction arguments.
+                    returnValue = scopeFunc.call(trans, trans);
+                    if (returnValue) {
+                        if (returnValue.constructor === NativePromise) {
+                            var decrementor = decrementExpectedAwaits.bind(null, null);
+                            returnValue.then(decrementor, decrementor);
+                        } else if (typeof returnValue.next === 'function' && typeof returnValue.throw === 'function') {
+                            // scopeFunc returned an iterator with throw-support. Handle yield as await.
+                            returnValue = awaitIterator(returnValue);
                         }
-                    }).uncaught(dbUncaught).then(function () {
+                    }
+                }, zoneProps);
+                return Promise.resolve(returnValue).finally(function () {
+                    if (!trans.active) throw new exceptions.PrematureCommit("Transaction committed too early. See http://bit.ly/2eVASrf");
+                }).then(function (x) {
+                    return promiseFollowed.then(function () {
                         if (parentTransaction) trans._resolve(); // sub transactions don't react to idbtrans.oncomplete. We must trigger a acompletion.
-                        return trans._completion; // Even if WE believe everything is fine. Await IDBTransaction's oncomplete or onerror as well.
                     }).then(function () {
-                        return returnValue;
-                    }).catch(function (e) {
-                        //reject(e);
-                        trans._reject(e); // Yes, above then-handler were maybe not called because of an unhandled rejection in scopeFunc!
-                        return rejection(e);
+                        return trans._completion;
+                    }).then(function () {
+                        return x;
                     });
-                    //});
+                }).catch(function (e) {
+                    trans._reject(e); // Yes, above then-handler were maybe not called because of an unhandled rejection in scopeFunc!
+                    return rejection(e);
                 });
             }));
         }
     };
 
     this.table = function (tableName) {
-        /// <returns type="WriteableTable"></returns>
-        if (fake && autoSchema) return new WriteableTable(tableName);
+        /// <returns type="Table"></returns>
+        if (fake && autoSchema) return new Table(tableName);
         if (!hasOwn(allTables, tableName)) {
             throw new exceptions.InvalidTable('Table ' + tableName + ' does not exist');
         }
@@ -2233,7 +2307,7 @@ function Dexie(dbName, options) {
     //
     //
     //
-    function Table(name, tableSchema, collClass) {
+    function Table(name, tableSchema) {
         /// <param name="name" type="String"></param>
         this.name = name;
         this.schema = tableSchema;
@@ -2243,7 +2317,50 @@ function Dexie(dbName, options) {
             "updating": [hookUpdatingChain, nop],
             "deleting": [hookDeletingChain, nop]
         });
-        this._collClass = collClass || Collection;
+    }
+
+    function BulkErrorHandlerCatchAll(errorList, done, supportHooks) {
+        return (supportHooks ? hookedEventRejectHandler : eventRejectHandler)(function (e) {
+            errorList.push(e);
+            done && done();
+        });
+    }
+
+    function bulkDelete(idbstore, trans, keysOrTuples, hasDeleteHook, deletingHook) {
+        // If hasDeleteHook, keysOrTuples must be an array of tuples: [[key1, value2],[key2,value2],...],
+        // else keysOrTuples must be just an array of keys: [key1, key2, ...].
+        return new Promise(function (resolve, reject) {
+            var len = keysOrTuples.length,
+                lastItem = len - 1;
+            if (len === 0) return resolve();
+            if (!hasDeleteHook) {
+                for (var i = 0; i < len; ++i) {
+                    var req = idbstore.delete(keysOrTuples[i]);
+                    req.onerror = eventRejectHandler(reject);
+                    if (i === lastItem) req.onsuccess = wrap(function () {
+                        return resolve();
+                    });
+                }
+            } else {
+                var hookCtx,
+                    errorHandler = hookedEventRejectHandler(reject),
+                    successHandler = hookedEventSuccessHandler(null);
+                tryCatch(function () {
+                    for (var i = 0; i < len; ++i) {
+                        hookCtx = { onsuccess: null, onerror: null };
+                        var tuple = keysOrTuples[i];
+                        deletingHook.call(hookCtx, tuple[0], tuple[1], trans);
+                        var req = idbstore.delete(tuple[0]);
+                        req._hookCtx = hookCtx;
+                        req.onerror = errorHandler;
+                        if (i === lastItem) req.onsuccess = hookedEventSuccessHandler(resolve);else req.onsuccess = successHandler;
+                    }
+                }, function (err) {
+                    hookCtx.onerror && hookCtx.onerror(err);
+                    throw err;
+                });
+            }
+        });
     }
 
     props(Table.prototype, {
@@ -2305,11 +2422,11 @@ function Dexie(dbName, options) {
             return this.toCollection().toArray(cb);
         },
         orderBy: function (index) {
-            return new this._collClass(new WhereClause(this, index));
+            return new Collection(new WhereClause(this, index));
         },
 
         toCollection: function () {
-            return new this._collClass(new WhereClause(this));
+            return new Collection(new WhereClause(this));
         },
 
         mapToClass: function (constructor, structure) {
@@ -2357,65 +2474,8 @@ function Dexie(dbName, options) {
             /// <param name="structure">Helps IDE code completion by knowing the members that objects contain and not just the indexes. Also
             /// know what type each member has. Example: {name: String, emailAddresses: [String], properties: {shoeSize: Number}}</param>
             return this.mapToClass(Dexie.defineClass(structure), structure);
-        }
-    });
+        },
 
-    //
-    //
-    //
-    // WriteableTable Class (extends Table)
-    //
-    //
-    //
-    function WriteableTable(name, tableSchema, collClass) {
-        Table.call(this, name, tableSchema, collClass || WriteableCollection);
-    }
-
-    function BulkErrorHandlerCatchAll(errorList, done, supportHooks) {
-        return (supportHooks ? hookedEventRejectHandler : eventRejectHandler)(function (e) {
-            errorList.push(e);
-            done && done();
-        });
-    }
-
-    function bulkDelete(idbstore, trans, keysOrTuples, hasDeleteHook, deletingHook) {
-        // If hasDeleteHook, keysOrTuples must be an array of tuples: [[key1, value2],[key2,value2],...],
-        // else keysOrTuples must be just an array of keys: [key1, key2, ...].
-        return new Promise(function (resolve, reject) {
-            var len = keysOrTuples.length,
-                lastItem = len - 1;
-            if (len === 0) return resolve();
-            if (!hasDeleteHook) {
-                for (var i = 0; i < len; ++i) {
-                    var req = idbstore.delete(keysOrTuples[i]);
-                    req.onerror = wrap(eventRejectHandler(reject));
-                    if (i === lastItem) req.onsuccess = wrap(function () {
-                        return resolve();
-                    });
-                }
-            } else {
-                var hookCtx,
-                    errorHandler = hookedEventRejectHandler(reject),
-                    successHandler = hookedEventSuccessHandler(null);
-                tryCatch(function () {
-                    for (var i = 0; i < len; ++i) {
-                        hookCtx = { onsuccess: null, onerror: null };
-                        var tuple = keysOrTuples[i];
-                        deletingHook.call(hookCtx, tuple[0], tuple[1], trans);
-                        var req = idbstore.delete(tuple[0]);
-                        req._hookCtx = hookCtx;
-                        req.onerror = errorHandler;
-                        if (i === lastItem) req.onsuccess = hookedEventSuccessHandler(resolve);else req.onsuccess = successHandler;
-                    }
-                }, function (err) {
-                    hookCtx.onerror && hookCtx.onerror(err);
-                    throw err;
-                });
-            }
-        }).uncaught(dbUncaught);
-    }
-
-    derive(WriteableTable).from(Table).extend({
         bulkDelete: function (keys$$1) {
             if (this.hook.deleting.fire === nop) {
                 return this._idbstore(READWRITE, function (resolve, reject, idbstore, trans) {
@@ -2617,58 +2677,49 @@ function Dexie(dbName, options) {
         },
 
         put: function (obj, key) {
+            var _this2 = this;
+
             /// <summary>
             ///   Add an object to the database but in case an object with same primary key alread exists, the existing one will get updated.
             /// </summary>
             /// <param name="obj" type="Object">A javascript object to insert or update</param>
             /// <param name="key" optional="true">Primary key</param>
-            var self = this,
-                creatingHook = this.hook.creating.fire,
+            var creatingHook = this.hook.creating.fire,
                 updatingHook = this.hook.updating.fire;
             if (creatingHook !== nop || updatingHook !== nop) {
                 //
                 // People listens to when("creating") or when("updating") events!
                 // We must know whether the put operation results in an CREATE or UPDATE.
                 //
-                return this._trans(READWRITE, function (resolve, reject, trans) {
-                    // Since key is optional, make sure we get it from obj if not provided
-                    var effectiveKey = key !== undefined ? key : self.schema.primKey.keyPath && getByKeyPath(obj, self.schema.primKey.keyPath);
-                    if (effectiveKey == null) {
-                        // "== null" means checking for either null or undefined.
-                        // No primary key. Must use add().
-                        self.add(obj).then(resolve, reject);
-                    } else {
-                        // Primary key exist. Lock transaction and try modifying existing. If nothing modified, call add().
-                        trans._lock(); // Needed because operation is splitted into modify() and add().
-                        // clone obj before this async call. If caller modifies obj the line after put(), the IDB spec requires that it should not affect operation.
-                        obj = deepClone(obj);
-                        self.where(":id").equals(effectiveKey).modify(function () {
-                            // Replace extisting value with our object
-                            // CRUD event firing handled in WriteableCollection.modify()
-                            this.value = obj;
-                        }).then(function (count) {
-                            if (count === 0) {
-                                // Object's key was not found. Add the object instead.
-                                // CRUD event firing will be done in add()
-                                return self.add(obj, key); // Resolving with another Promise. Returned Promise will then resolve with the new key.
-                            } else {
-                                return effectiveKey; // Resolve with the provided key.
-                            }
-                        }).finally(function () {
-                            trans._unlock();
-                        }).then(resolve, reject);
-                    }
-                });
+                var keyPath = this.schema.primKey.keyPath;
+                var effectiveKey = key !== undefined ? key : keyPath && getByKeyPath(obj, keyPath);
+                if (effectiveKey == null) // "== null" means checking for either null or undefined.
+                    return this.add(obj);
+
+                // Since key is optional, make sure we get it from obj if not provided
+
+                // Primary key exist. Lock transaction and try modifying existing. If nothing modified, call add().
+                // clone obj before this async call. If caller modifies obj the line after put(), the IDB spec requires that it should not affect operation.
+                obj = deepClone(obj);
+                return this._trans(READWRITE, function () {
+                    return _this2.where(":id").equals(effectiveKey).modify(function () {
+                        // Replace extisting value with our object
+                        // CRUD event firing handled in Collection.modify()
+                        this.value = obj;
+                    }).then(function (count) {
+                        return count === 0 ? _this2.add(obj, key) : effectiveKey;
+                    });
+                }, "locked"); // Lock needed because operation is splitted into modify() and add().
             } else {
                 // Use the standard IDB put() method.
                 return this._idbstore(READWRITE, function (resolve, reject, idbstore) {
                     var req = key !== undefined ? idbstore.put(obj, key) : idbstore.put(obj);
                     req.onerror = eventRejectHandler(reject);
-                    req.onsuccess = function (ev) {
+                    req.onsuccess = wrap(function (ev) {
                         var keyPath = idbstore.keyPath;
                         if (keyPath) setByKeyPath(obj, keyPath, ev.target.result);
                         resolve(req.result);
-                    };
+                    });
                 });
             }
         },
@@ -2676,33 +2727,33 @@ function Dexie(dbName, options) {
         'delete': function (key) {
             /// <param name="key">Primary key of the object to delete</param>
             if (this.hook.deleting.subscribers.length) {
-                // People listens to when("deleting") event. Must implement delete using WriteableCollection.delete() that will
-                // call the CRUD event. Only WriteableCollection.delete() will know whether an object was actually deleted.
+                // People listens to when("deleting") event. Must implement delete using Collection.delete() that will
+                // call the CRUD event. Only Collection.delete() will know whether an object was actually deleted.
                 return this.where(":id").equals(key).delete();
             } else {
                 // No one listens. Use standard IDB delete() method.
                 return this._idbstore(READWRITE, function (resolve, reject, idbstore) {
                     var req = idbstore.delete(key);
                     req.onerror = eventRejectHandler(reject);
-                    req.onsuccess = function () {
+                    req.onsuccess = wrap(function () {
                         resolve(req.result);
-                    };
+                    });
                 });
             }
         },
 
         clear: function () {
             if (this.hook.deleting.subscribers.length) {
-                // People listens to when("deleting") event. Must implement delete using WriteableCollection.delete() that will
-                // call the CRUD event. Only WriteableCollection.delete() will knows which objects that are actually deleted.
+                // People listens to when("deleting") event. Must implement delete using Collection.delete() that will
+                // call the CRUD event. Only Collection.delete() will knows which objects that are actually deleted.
                 return this.toCollection().delete();
             } else {
                 return this._idbstore(READWRITE, function (resolve, reject, idbstore) {
                     var req = idbstore.clear();
                     req.onerror = eventRejectHandler(reject);
-                    req.onsuccess = function () {
+                    req.onsuccess = wrap(function () {
                         resolve(req.result);
-                    };
+                    });
                 });
             }
         },
@@ -2715,7 +2766,7 @@ function Dexie(dbName, options) {
                     setByKeyPath(keyOrObject, keyPath, modifications[keyPath]);
                 });
                 var key = getByKeyPath(keyOrObject, this.schema.primKey.keyPath);
-                if (key === undefined) return rejection(new exceptions.InvalidArgument("Given object does not contain its primary key"), dbUncaught);
+                if (key === undefined) return rejection(new exceptions.InvalidArgument("Given object does not contain its primary key"));
                 return this.where(":id").equals(key).modify(modifications);
             } else {
                 // key to modify
@@ -2732,7 +2783,7 @@ function Dexie(dbName, options) {
     //
     //
     function Transaction(mode, storeNames, dbschema, parent) {
-        var _this2 = this;
+        var _this3 = this;
 
         /// <summary>
         ///    Transaction class. Represents a database transaction. All operations on db goes through a Transaction.
@@ -2754,16 +2805,16 @@ function Dexie(dbName, options) {
         this._resolve = null;
         this._reject = null;
         this._completion = new Promise(function (resolve, reject) {
-            _this2._resolve = resolve;
-            _this2._reject = reject;
-        }).uncaught(dbUncaught);
+            _this3._resolve = resolve;
+            _this3._reject = reject;
+        });
 
         this._completion.then(function () {
-            _this2.on.complete.fire();
+            _this3.on.complete.fire();
         }, function (e) {
-            _this2.on.error.fire(e);
-            _this2.parent ? _this2.parent._reject(e) : _this2.active && _this2.idbtrans && _this2.idbtrans.abort();
-            _this2.active = false;
+            _this3.on.error.fire(e);
+            _this3.parent ? _this3.parent._reject(e) : _this3.active && _this3.idbtrans && _this3.idbtrans.abort();
+            _this3.active = false;
             return rejection(e); // Indicate we actually DO NOT catch this error.
         });
     }
@@ -2806,8 +2857,9 @@ function Dexie(dbName, options) {
             return this._reculock && PSD.lockOwnerFor !== this;
         },
         create: function (idbtrans) {
-            var _this3 = this;
+            var _this4 = this;
 
+            if (!this.mode) return this;
             assert(!this.idbtrans);
             if (!idbtrans && !idbdb) {
                 switch (dbOpenError && dbOpenError.name) {
@@ -2828,43 +2880,70 @@ function Dexie(dbName, options) {
             idbtrans = this.idbtrans = idbtrans || idbdb.transaction(safariMultiStoreFix(this.storeNames), this.mode);
             idbtrans.onerror = wrap(function (ev) {
                 preventDefault(ev); // Prohibit default bubbling to window.error
-                _this3._reject(idbtrans.error);
+                _this4._reject(idbtrans.error);
             });
             idbtrans.onabort = wrap(function (ev) {
                 preventDefault(ev);
-                _this3.active && _this3._reject(new exceptions.Abort());
-                _this3.active = false;
-                _this3.on("abort").fire(ev);
+                _this4.active && _this4._reject(new exceptions.Abort());
+                _this4.active = false;
+                _this4.on("abort").fire(ev);
             });
             idbtrans.oncomplete = wrap(function () {
-                _this3.active = false;
-                _this3._resolve();
+                _this4.active = false;
+                _this4._resolve();
             });
             return this;
         },
-        _promise: function (mode, fn, bWriteLock) {
-            var self = this;
-            var p = self._locked() ?
-            // Read lock always. Transaction is write-locked. Wait for mutex.
-            new Promise(function (resolve, reject) {
-                self._blockedFuncs.push([function () {
-                    self._promise(mode, fn, bWriteLock).then(resolve, reject);
-                }, PSD]);
-            }) : newScope(function () {
-                var p_ = self.active ? new Promise(function (resolve, reject) {
-                    if (mode === READWRITE && self.mode !== READWRITE) throw new exceptions.ReadOnly("Transaction is readonly");
-                    if (!self.idbtrans && mode) self.create();
-                    if (bWriteLock) self._lock(); // Write lock if write operation is requested
-                    fn(resolve, reject, self);
-                }) : rejection(new exceptions.TransactionInactive());
-                if (self.active && bWriteLock) p_.finally(function () {
-                    self._unlock();
+        /*lock: function (fn) { 
+            if (this._locked()) return new Promise ((resolve, reject) => {
+                this._blockedFuncs.push(()=>{
+                    this.lock(fn).then(resolve, reject);
                 });
-                return p_;
             });
+              return newScope(()=>{
+                this._lock();
+                try {
+                    return fn(this).finally(()=>this._unlock());
+                } catch(ex) {
+                    this._unlock();
+                    return rejection(ex);
+                }
+            });
+        },*/ // Remarked because it's not used. SHould be working though and could be a replacement of _promise(..., "locked").
+        _promise: function (mode, fn, bWriteLock) {
+            var _this5 = this;
 
-            p._lib = true;
-            return p.uncaught(dbUncaught);
+            if (mode === READWRITE && this.mode !== READWRITE) return rejection(new exceptions.ReadOnly("Transaction is readonly"));
+
+            if (!this.active) return rejection(new exceptions.TransactionInactive());
+
+            if (this._locked()) {
+                return new Promise(function (resolve, reject) {
+                    _this5._blockedFuncs.push([function () {
+                        _this5._promise(mode, fn, bWriteLock).then(resolve, reject);
+                    }, PSD]);
+                });
+            } else if (bWriteLock) {
+                return newScope(function () {
+                    var p = new Promise(function (resolve, reject) {
+                        _this5._lock();
+                        var rv = fn(resolve, reject, _this5);
+                        if (rv && rv.then) rv.then(resolve, reject);
+                    });
+                    p.finally(function () {
+                        return _this5._unlock();
+                    });
+                    p._lib = true;
+                    return p;
+                });
+            } else {
+                var p = new Promise(function (resolve, reject) {
+                    var rv = fn(resolve, reject, _this5);
+                    if (rv && rv.then) rv.then(resolve, reject);
+                });
+                p._lib = true;
+                return p;
+            }
         },
 
         //
@@ -2877,25 +2956,13 @@ function Dexie(dbName, options) {
 
         tables: {
             get: deprecated("Transaction.tables", function () {
-                return arrayToObject(this.storeNames, function (name) {
-                    return [name, allTables[name]];
-                });
-            }, "Use db.tables()")
+                return allTables;
+            })
         },
 
-        complete: deprecated("Transaction.complete()", function (cb) {
-            return this.on("complete", cb);
-        }),
-
-        error: deprecated("Transaction.error()", function (cb) {
-            return this.on("error", cb);
-        }),
-
         table: deprecated("Transaction.table()", function (name) {
-            if (this.storeNames.indexOf(name) === -1) throw new exceptions.InvalidTable("Table " + name + " not in transaction");
             return allTables[name];
         })
-
     });
 
     //
@@ -2912,7 +2979,6 @@ function Dexie(dbName, options) {
         this._ctx = {
             table: table,
             index: index === ":id" ? null : index,
-            collClass: table._collClass,
             or: orCollection
         };
     }
@@ -2922,14 +2988,14 @@ function Dexie(dbName, options) {
         // WhereClause private methods
 
         function fail(collectionOrWhereClause, err, T) {
-            var collection = collectionOrWhereClause instanceof WhereClause ? new collectionOrWhereClause._ctx.collClass(collectionOrWhereClause) : collectionOrWhereClause;
+            var collection = collectionOrWhereClause instanceof WhereClause ? new Collection(collectionOrWhereClause) : collectionOrWhereClause;
 
             collection._ctx.error = T ? new T(err) : new TypeError(err);
             return collection;
         }
 
         function emptyCollection(whereClause) {
-            return new whereClause._ctx.collClass(whereClause, function () {
+            return new Collection(whereClause, function () {
                 return IDBKeyRange.only("");
             }).limit(0);
         }
@@ -3001,7 +3067,7 @@ function Dexie(dbName, options) {
             }
             initDirection("next");
 
-            var c = new whereClause._ctx.collClass(whereClause, function () {
+            var c = new Collection(whereClause, function () {
                 return IDBKeyRange.bound(upperNeedles[0], lowerNeedles[needlesLen - 1] + suffix);
             });
 
@@ -3059,7 +3125,7 @@ function Dexie(dbName, options) {
                 includeUpper = includeUpper === true; // Default to false
                 try {
                     if (cmp(lower, upper) > 0 || cmp(lower, upper) === 0 && (includeLower || includeUpper) && !(includeLower && includeUpper)) return emptyCollection(this); // Workaround for idiotic W3C Specification that DataError must be thrown if lower > upper. The natural result would be to return an empty collection.
-                    return new this._ctx.collClass(this, function () {
+                    return new Collection(this, function () {
                         return IDBKeyRange.bound(lower, upper, !includeLower, !includeUpper);
                     });
                 } catch (e) {
@@ -3067,27 +3133,27 @@ function Dexie(dbName, options) {
                 }
             },
             equals: function (value) {
-                return new this._ctx.collClass(this, function () {
+                return new Collection(this, function () {
                     return IDBKeyRange.only(value);
                 });
             },
             above: function (value) {
-                return new this._ctx.collClass(this, function () {
+                return new Collection(this, function () {
                     return IDBKeyRange.lowerBound(value, true);
                 });
             },
             aboveOrEqual: function (value) {
-                return new this._ctx.collClass(this, function () {
+                return new Collection(this, function () {
                     return IDBKeyRange.lowerBound(value);
                 });
             },
             below: function (value) {
-                return new this._ctx.collClass(this, function () {
+                return new Collection(this, function () {
                     return IDBKeyRange.upperBound(value, true);
                 });
             },
             belowOrEqual: function (value) {
-                return new this._ctx.collClass(this, function () {
+                return new Collection(this, function () {
                     return IDBKeyRange.upperBound(value);
                 });
             },
@@ -3134,7 +3200,7 @@ function Dexie(dbName, options) {
                     return fail(this, INVALID_KEY_ARGUMENT);
                 }
                 if (set.length === 0) return emptyCollection(this);
-                var c = new this._ctx.collClass(this, function () {
+                var c = new Collection(this, function () {
                     return IDBKeyRange.bound(set[0], set[set.length - 1]);
                 });
 
@@ -3174,7 +3240,7 @@ function Dexie(dbName, options) {
 
             noneOf: function () {
                 var set = getArrayOf.apply(NO_CHAR_ARRAY, arguments);
-                if (set.length === 0) return new this._ctx.collClass(this); // Return entire collection.
+                if (set.length === 0) return new Collection(this); // Return entire collection.
                 try {
                     set.sort(ascending);
                 } catch (e) {
@@ -3197,7 +3263,6 @@ function Dexie(dbName, options) {
             * @param {{includeLowers: boolean, includeUppers: boolean}} options
             */
             inAnyRange: function (ranges, options) {
-                var ctx = this._ctx;
                 if (ranges.length === 0) return emptyCollection(this);
                 if (!ranges.every(function (range) {
                     return range[0] !== undefined && range[1] !== undefined && ascending(range[0], range[1]) <= 0;
@@ -3253,7 +3318,7 @@ function Dexie(dbName, options) {
 
                 var checkKey = keyIsBeyondCurrentEntry;
 
-                var c = new ctx.collClass(this, function () {
+                var c = new Collection(this, function () {
                     return IDBKeyRange.bound(set[0][0], set[set.length - 1][1], !includeLowers, !includeUppers);
                 });
 
@@ -3560,13 +3625,13 @@ function Dexie(dbName, options) {
                         var idxOrStore = getIndexOrStore(ctx, idbstore);
                         var req = ctx.limit < Infinity ? idxOrStore.getAll(ctx.range, ctx.limit) : idxOrStore.getAll(ctx.range);
                         req.onerror = eventRejectHandler(reject);
-                        req.onsuccess = readingHook === mirror ? eventSuccessHandler(resolve) : wrap(eventSuccessHandler(function (res) {
+                        req.onsuccess = readingHook === mirror ? eventSuccessHandler(resolve) : eventSuccessHandler(function (res) {
                             try {
                                 resolve(res.map(readingHook));
                             } catch (e) {
                                 reject(e);
                             }
-                        }));
+                        });
                     } else {
                         // Getting array through a cursor.
                         var a = [];
@@ -3755,241 +3820,229 @@ function Dexie(dbName, options) {
                     return !found;
                 });
                 return this;
-            }
-        };
-    });
+            },
 
-    //
-    //
-    // WriteableCollection Class
-    //
-    //
-    function WriteableCollection() {
-        Collection.apply(this, arguments);
-    }
+            //
+            // Methods that mutate storage
+            //
 
-    derive(WriteableCollection).from(Collection).extend({
+            modify: function (changes) {
+                var self = this,
+                    ctx = this._ctx,
+                    hook = ctx.table.hook,
+                    updatingHook = hook.updating.fire,
+                    deletingHook = hook.deleting.fire;
 
-        //
-        // WriteableCollection Public Methods
-        //
+                fake && typeof changes === 'function' && changes.call({ value: ctx.table.schema.instanceTemplate }, ctx.table.schema.instanceTemplate);
 
-        modify: function (changes) {
-            var self = this,
-                ctx = this._ctx,
-                hook = ctx.table.hook,
-                updatingHook = hook.updating.fire,
-                deletingHook = hook.deleting.fire;
-
-            fake && typeof changes === 'function' && changes.call({ value: ctx.table.schema.instanceTemplate }, ctx.table.schema.instanceTemplate);
-
-            return this._write(function (resolve, reject, idbstore, trans) {
-                var modifyer;
-                if (typeof changes === 'function') {
-                    // Changes is a function that may update, add or delete propterties or even require a deletion the object itself (delete this.item)
-                    if (updatingHook === nop && deletingHook === nop) {
-                        // Noone cares about what is being changed. Just let the modifier function be the given argument as is.
-                        modifyer = changes;
-                    } else {
-                        // People want to know exactly what is being modified or deleted.
-                        // Let modifyer be a proxy function that finds out what changes the caller is actually doing
-                        // and call the hooks accordingly!
+                return this._write(function (resolve, reject, idbstore, trans) {
+                    var modifyer;
+                    if (typeof changes === 'function') {
+                        // Changes is a function that may update, add or delete propterties or even require a deletion the object itself (delete this.item)
+                        if (updatingHook === nop && deletingHook === nop) {
+                            // Noone cares about what is being changed. Just let the modifier function be the given argument as is.
+                            modifyer = changes;
+                        } else {
+                            // People want to know exactly what is being modified or deleted.
+                            // Let modifyer be a proxy function that finds out what changes the caller is actually doing
+                            // and call the hooks accordingly!
+                            modifyer = function (item) {
+                                var origItem = deepClone(item); // Clone the item first so we can compare laters.
+                                if (changes.call(this, item, this) === false) return false; // Call the real modifyer function (If it returns false explicitely, it means it dont want to modify anyting on this object)
+                                if (!hasOwn(this, "value")) {
+                                    // The real modifyer function requests a deletion of the object. Inform the deletingHook that a deletion is taking place.
+                                    deletingHook.call(this, this.primKey, item, trans);
+                                } else {
+                                    // No deletion. Check what was changed
+                                    var objectDiff = getObjectDiff(origItem, this.value);
+                                    var additionalChanges = updatingHook.call(this, objectDiff, this.primKey, origItem, trans);
+                                    if (additionalChanges) {
+                                        // Hook want to apply additional modifications. Make sure to fullfill the will of the hook.
+                                        item = this.value;
+                                        keys(additionalChanges).forEach(function (keyPath) {
+                                            setByKeyPath(item, keyPath, additionalChanges[keyPath]); // Adding {keyPath: undefined} means that the keyPath should be deleted. Handled by setByKeyPath
+                                        });
+                                    }
+                                }
+                            };
+                        }
+                    } else if (updatingHook === nop) {
+                        // changes is a set of {keyPath: value} and no one is listening to the updating hook.
+                        var keyPaths = keys(changes);
+                        var numKeys = keyPaths.length;
                         modifyer = function (item) {
-                            var origItem = deepClone(item); // Clone the item first so we can compare laters.
-                            if (changes.call(this, item, this) === false) return false; // Call the real modifyer function (If it returns false explicitely, it means it dont want to modify anyting on this object)
-                            if (!hasOwn(this, "value")) {
-                                // The real modifyer function requests a deletion of the object. Inform the deletingHook that a deletion is taking place.
-                                deletingHook.call(this, this.primKey, item, trans);
-                            } else {
-                                // No deletion. Check what was changed
-                                var objectDiff = getObjectDiff(origItem, this.value);
-                                var additionalChanges = updatingHook.call(this, objectDiff, this.primKey, origItem, trans);
-                                if (additionalChanges) {
-                                    // Hook want to apply additional modifications. Make sure to fullfill the will of the hook.
-                                    item = this.value;
-                                    keys(additionalChanges).forEach(function (keyPath) {
-                                        setByKeyPath(item, keyPath, additionalChanges[keyPath]); // Adding {keyPath: undefined} means that the keyPath should be deleted. Handled by setByKeyPath
-                                    });
+                            var anythingModified = false;
+                            for (var i = 0; i < numKeys; ++i) {
+                                var keyPath = keyPaths[i],
+                                    val = changes[keyPath];
+                                if (getByKeyPath(item, keyPath) !== val) {
+                                    setByKeyPath(item, keyPath, val); // Adding {keyPath: undefined} means that the keyPath should be deleted. Handled by setByKeyPath
+                                    anythingModified = true;
                                 }
                             }
+                            return anythingModified;
+                        };
+                    } else {
+                        // changes is a set of {keyPath: value} and people are listening to the updating hook so we need to call it and
+                        // allow it to add additional modifications to make.
+                        var origChanges = changes;
+                        changes = shallowClone(origChanges); // Let's work with a clone of the changes keyPath/value set so that we can restore it in case a hook extends it.
+                        modifyer = function (item) {
+                            var anythingModified = false;
+                            var additionalChanges = updatingHook.call(this, changes, this.primKey, deepClone(item), trans);
+                            if (additionalChanges) extend(changes, additionalChanges);
+                            keys(changes).forEach(function (keyPath) {
+                                var val = changes[keyPath];
+                                if (getByKeyPath(item, keyPath) !== val) {
+                                    setByKeyPath(item, keyPath, val);
+                                    anythingModified = true;
+                                }
+                            });
+                            if (additionalChanges) changes = shallowClone(origChanges); // Restore original changes for next iteration
+                            return anythingModified;
                         };
                     }
-                } else if (updatingHook === nop) {
-                    // changes is a set of {keyPath: value} and no one is listening to the updating hook.
-                    var keyPaths = keys(changes);
-                    var numKeys = keyPaths.length;
-                    modifyer = function (item) {
-                        var anythingModified = false;
-                        for (var i = 0; i < numKeys; ++i) {
-                            var keyPath = keyPaths[i],
-                                val = changes[keyPath];
-                            if (getByKeyPath(item, keyPath) !== val) {
-                                setByKeyPath(item, keyPath, val); // Adding {keyPath: undefined} means that the keyPath should be deleted. Handled by setByKeyPath
-                                anythingModified = true;
-                            }
+
+                    var count = 0;
+                    var successCount = 0;
+                    var iterationComplete = false;
+                    var failures = [];
+                    var failKeys = [];
+                    var currentKey = null;
+
+                    function modifyItem(item, cursor) {
+                        currentKey = cursor.primaryKey;
+                        var thisContext = {
+                            primKey: cursor.primaryKey,
+                            value: item,
+                            onsuccess: null,
+                            onerror: null
+                        };
+
+                        function onerror(e) {
+                            failures.push(e);
+                            failKeys.push(thisContext.primKey);
+                            checkFinished();
+                            return true; // Catch these errors and let a final rejection decide whether or not to abort entire transaction
                         }
-                        return anythingModified;
-                    };
-                } else {
-                    // changes is a set of {keyPath: value} and people are listening to the updating hook so we need to call it and
-                    // allow it to add additional modifications to make.
-                    var origChanges = changes;
-                    changes = shallowClone(origChanges); // Let's work with a clone of the changes keyPath/value set so that we can restore it in case a hook extends it.
-                    modifyer = function (item) {
-                        var anythingModified = false;
-                        var additionalChanges = updatingHook.call(this, changes, this.primKey, deepClone(item), trans);
-                        if (additionalChanges) extend(changes, additionalChanges);
-                        keys(changes).forEach(function (keyPath) {
-                            var val = changes[keyPath];
-                            if (getByKeyPath(item, keyPath) !== val) {
-                                setByKeyPath(item, keyPath, val);
-                                anythingModified = true;
-                            }
-                        });
-                        if (additionalChanges) changes = shallowClone(origChanges); // Restore original changes for next iteration
-                        return anythingModified;
-                    };
-                }
 
-                var count = 0;
-                var successCount = 0;
-                var iterationComplete = false;
-                var failures = [];
-                var failKeys = [];
-                var currentKey = null;
-
-                function modifyItem(item, cursor) {
-                    currentKey = cursor.primaryKey;
-                    var thisContext = {
-                        primKey: cursor.primaryKey,
-                        value: item,
-                        onsuccess: null,
-                        onerror: null
-                    };
-
-                    function onerror(e) {
-                        failures.push(e);
-                        failKeys.push(thisContext.primKey);
-                        checkFinished();
-                        return true; // Catch these errors and let a final rejection decide whether or not to abort entire transaction
-                    }
-
-                    if (modifyer.call(thisContext, item, thisContext) !== false) {
-                        // If a callback explicitely returns false, do not perform the update!
-                        var bDelete = !hasOwn(thisContext, "value");
-                        ++count;
-                        tryCatch(function () {
-                            var req = bDelete ? cursor.delete() : cursor.update(thisContext.value);
-                            req._hookCtx = thisContext;
-                            req.onerror = hookedEventRejectHandler(onerror);
-                            req.onsuccess = hookedEventSuccessHandler(function () {
-                                ++successCount;
-                                checkFinished();
-                            });
-                        }, onerror);
-                    } else if (thisContext.onsuccess) {
-                        // Hook will expect either onerror or onsuccess to always be called!
-                        thisContext.onsuccess(thisContext.value);
-                    }
-                }
-
-                function doReject(e) {
-                    if (e) {
-                        failures.push(e);
-                        failKeys.push(currentKey);
-                    }
-                    return reject(new ModifyError("Error modifying one or more objects", failures, successCount, failKeys));
-                }
-
-                function checkFinished() {
-                    if (iterationComplete && successCount + failures.length === count) {
-                        if (failures.length > 0) doReject();else resolve(successCount);
-                    }
-                }
-                self.clone().raw()._iterate(modifyItem, function () {
-                    iterationComplete = true;
-                    checkFinished();
-                }, doReject, idbstore);
-            });
-        },
-
-        'delete': function () {
-            var _this4 = this;
-
-            var ctx = this._ctx,
-                range = ctx.range,
-                deletingHook = ctx.table.hook.deleting.fire,
-                hasDeleteHook = deletingHook !== nop;
-            if (!hasDeleteHook && isPlainKeyRange(ctx) && (ctx.isPrimKey && !hangsOnDeleteLargeKeyRange || !range)) // if no range, we'll use clear().
-                {
-                    // May use IDBObjectStore.delete(IDBKeyRange) in this case (Issue #208)
-                    // For chromium, this is the way most optimized version.
-                    // For IE/Edge, this could hang the indexedDB engine and make operating system instable
-                    // (https://gist.github.com/dfahlander/5a39328f029de18222cf2125d56c38f7)
-                    return this._write(function (resolve, reject, idbstore) {
-                        // Our API contract is to return a count of deleted items, so we have to count() before delete().
-                        var onerror = eventRejectHandler(reject),
-                            countReq = range ? idbstore.count(range) : idbstore.count();
-                        countReq.onerror = onerror;
-                        countReq.onsuccess = function () {
-                            var count = countReq.result;
+                        if (modifyer.call(thisContext, item, thisContext) !== false) {
+                            // If a callback explicitely returns false, do not perform the update!
+                            var bDelete = !hasOwn(thisContext, "value");
+                            ++count;
                             tryCatch(function () {
-                                var delReq = range ? idbstore.delete(range) : idbstore.clear();
-                                delReq.onerror = onerror;
-                                delReq.onsuccess = function () {
-                                    return resolve(count);
-                                };
-                            }, function (err) {
-                                return reject(err);
-                            });
-                        };
-                    });
-                }
+                                var req = bDelete ? cursor.delete() : cursor.update(thisContext.value);
+                                req._hookCtx = thisContext;
+                                req.onerror = hookedEventRejectHandler(onerror);
+                                req.onsuccess = hookedEventSuccessHandler(function () {
+                                    ++successCount;
+                                    checkFinished();
+                                });
+                            }, onerror);
+                        } else if (thisContext.onsuccess) {
+                            // Hook will expect either onerror or onsuccess to always be called!
+                            thisContext.onsuccess(thisContext.value);
+                        }
+                    }
 
-            // Default version to use when collection is not a vanilla IDBKeyRange on the primary key.
-            // Divide into chunks to not starve RAM.
-            // If has delete hook, we will have to collect not just keys but also objects, so it will use
-            // more memory and need lower chunk size.
-            var CHUNKSIZE = hasDeleteHook ? 2000 : 10000;
+                    function doReject(e) {
+                        if (e) {
+                            failures.push(e);
+                            failKeys.push(currentKey);
+                        }
+                        return reject(new ModifyError("Error modifying one or more objects", failures, successCount, failKeys));
+                    }
 
-            return this._write(function (resolve, reject, idbstore, trans) {
-                var totalCount = 0;
-                // Clone collection and change its table and set a limit of CHUNKSIZE on the cloned Collection instance.
-                var collection = _this4.clone({
-                    keysOnly: !ctx.isMatch && !hasDeleteHook }) // load just keys (unless filter() or and() or deleteHook has subscribers)
-                .distinct() // In case multiEntry is used, never delete same key twice because resulting count
-                // would become larger than actual delete count.
-                .limit(CHUNKSIZE).raw(); // Don't filter through reading-hooks (like mapped classes etc)
+                    function checkFinished() {
+                        if (iterationComplete && successCount + failures.length === count) {
+                            if (failures.length > 0) doReject();else resolve(successCount);
+                        }
+                    }
+                    self.clone().raw()._iterate(modifyItem, function () {
+                        iterationComplete = true;
+                        checkFinished();
+                    }, doReject, idbstore);
+                });
+            },
 
-                var keysOrTuples = [];
+            'delete': function () {
+                var _this6 = this;
 
-                // We're gonna do things on as many chunks that are needed.
-                // Use recursion of nextChunk function:
-                var nextChunk = function () {
-                    return collection.each(hasDeleteHook ? function (val, cursor) {
-                        // Somebody subscribes to hook('deleting'). Collect all primary keys and their values,
-                        // so that the hook can be called with its values in bulkDelete().
-                        keysOrTuples.push([cursor.primaryKey, cursor.value]);
-                    } : function (val, cursor) {
-                        // No one subscribes to hook('deleting'). Collect only primary keys:
-                        keysOrTuples.push(cursor.primaryKey);
-                    }).then(function () {
-                        // Chromium deletes faster when doing it in sort order.
-                        hasDeleteHook ? keysOrTuples.sort(function (a, b) {
-                            return ascending(a[0], b[0]);
-                        }) : keysOrTuples.sort(ascending);
-                        return bulkDelete(idbstore, trans, keysOrTuples, hasDeleteHook, deletingHook);
-                    }).then(function () {
-                        var count = keysOrTuples.length;
-                        totalCount += count;
-                        keysOrTuples = [];
-                        return count < CHUNKSIZE ? totalCount : nextChunk();
-                    });
-                };
+                var ctx = this._ctx,
+                    range = ctx.range,
+                    deletingHook = ctx.table.hook.deleting.fire,
+                    hasDeleteHook = deletingHook !== nop;
+                if (!hasDeleteHook && isPlainKeyRange(ctx) && (ctx.isPrimKey && !hangsOnDeleteLargeKeyRange || !range)) // if no range, we'll use clear().
+                    {
+                        // May use IDBObjectStore.delete(IDBKeyRange) in this case (Issue #208)
+                        // For chromium, this is the way most optimized version.
+                        // For IE/Edge, this could hang the indexedDB engine and make operating system instable
+                        // (https://gist.github.com/dfahlander/5a39328f029de18222cf2125d56c38f7)
+                        return this._write(function (resolve, reject, idbstore) {
+                            // Our API contract is to return a count of deleted items, so we have to count() before delete().
+                            var onerror = eventRejectHandler(reject),
+                                countReq = range ? idbstore.count(range) : idbstore.count();
+                            countReq.onerror = onerror;
+                            countReq.onsuccess = function () {
+                                var count = countReq.result;
+                                tryCatch(function () {
+                                    var delReq = range ? idbstore.delete(range) : idbstore.clear();
+                                    delReq.onerror = onerror;
+                                    delReq.onsuccess = function () {
+                                        return resolve(count);
+                                    };
+                                }, function (err) {
+                                    return reject(err);
+                                });
+                            };
+                        });
+                    }
 
-                resolve(nextChunk());
-            });
-        }
+                // Default version to use when collection is not a vanilla IDBKeyRange on the primary key.
+                // Divide into chunks to not starve RAM.
+                // If has delete hook, we will have to collect not just keys but also objects, so it will use
+                // more memory and need lower chunk size.
+                var CHUNKSIZE = hasDeleteHook ? 2000 : 10000;
+
+                return this._write(function (resolve, reject, idbstore, trans) {
+                    var totalCount = 0;
+                    // Clone collection and change its table and set a limit of CHUNKSIZE on the cloned Collection instance.
+                    var collection = _this6.clone({
+                        keysOnly: !ctx.isMatch && !hasDeleteHook }) // load just keys (unless filter() or and() or deleteHook has subscribers)
+                    .distinct() // In case multiEntry is used, never delete same key twice because resulting count
+                    // would become larger than actual delete count.
+                    .limit(CHUNKSIZE).raw(); // Don't filter through reading-hooks (like mapped classes etc)
+
+                    var keysOrTuples = [];
+
+                    // We're gonna do things on as many chunks that are needed.
+                    // Use recursion of nextChunk function:
+                    var nextChunk = function () {
+                        return collection.each(hasDeleteHook ? function (val, cursor) {
+                            // Somebody subscribes to hook('deleting'). Collect all primary keys and their values,
+                            // so that the hook can be called with its values in bulkDelete().
+                            keysOrTuples.push([cursor.primaryKey, cursor.value]);
+                        } : function (val, cursor) {
+                            // No one subscribes to hook('deleting'). Collect only primary keys:
+                            keysOrTuples.push(cursor.primaryKey);
+                        }).then(function () {
+                            // Chromium deletes faster when doing it in sort order.
+                            hasDeleteHook ? keysOrTuples.sort(function (a, b) {
+                                return ascending(a[0], b[0]);
+                            }) : keysOrTuples.sort(ascending);
+                            return bulkDelete(idbstore, trans, keysOrTuples, hasDeleteHook, deletingHook);
+                        }).then(function () {
+                            var count = keysOrTuples.length;
+                            totalCount += count;
+                            keysOrTuples = [];
+                            return count < CHUNKSIZE ? totalCount : nextChunk();
+                        });
+                    };
+
+                    resolve(nextChunk());
+                });
+            }
+        };
     });
 
     //
@@ -4004,9 +4057,11 @@ function Dexie(dbName, options) {
         return a._cfg.version - b._cfg.version;
     }
 
-    function setApiOnPlace(objs, tableNames, mode, dbschema) {
+    function setApiOnPlace(objs, tableNames, dbschema) {
         tableNames.forEach(function (tableName) {
-            var tableInstance = db._tableFactory(mode, dbschema[tableName]);
+            // Deprecate: In versions > 3.0, don't call _tableFactory anymore. Now just do it for bacward compatibility.
+            // Instead do new Table()
+            var tableInstance = db._tableFactory(READWRITE, dbschema[tableName]);
             objs.forEach(function (obj) {
                 tableName in obj || (obj[tableName] = tableInstance);
             });
@@ -4136,7 +4191,7 @@ function Dexie(dbName, options) {
             }
             globalSchema[storeName] = new TableSchema(storeName, primKey, indexes, {});
         });
-        setApiOnPlace([allTables, Transaction.prototype], keys(globalSchema), READWRITE, globalSchema);
+        setApiOnPlace([allTables], keys(globalSchema), globalSchema);
     }
 
     function adjustToExistingIndexNames(schema, idbtrans) {
@@ -4177,9 +4232,7 @@ function Dexie(dbName, options) {
         Table: Table,
         Transaction: Transaction,
         Version: Version,
-        WhereClause: WhereClause,
-        WriteableCollection: WriteableCollection,
-        WriteableTable: WriteableTable
+        WhereClause: WhereClause
     });
 
     init();
@@ -4214,12 +4267,6 @@ function applyStructure(obj, structure) {
     return obj;
 }
 
-function eventSuccessHandler(done) {
-    return function (ev) {
-        done(ev.target.result);
-    };
-}
-
 function hookedEventSuccessHandler(resolve) {
     // wrap() is needed when calling hooks because the rare scenario of:
     //  * hook does a db operation that fails immediately (IDB throws exception)
@@ -4242,11 +4289,17 @@ function hookedEventSuccessHandler(resolve) {
 }
 
 function eventRejectHandler(reject) {
-    return function (event) {
+    return wrap(function (event) {
         preventDefault(event);
         reject(event.target.error);
         return false;
-    };
+    });
+}
+
+function eventSuccessHandler(resolve) {
+    return wrap(function (event) {
+        resolve(event.target.result);
+    });
 }
 
 function hookedEventRejectHandler(reject) {
@@ -4530,9 +4583,6 @@ props(Dexie, {
     override: override,
     // Export our Events() function - can be handy as a toolkit
     Events: Events,
-    events: { get: deprecated(function () {
-            return Events;
-        }) }, // Backward compatible lowercase version.
     // Utilities
     getByKeyPath: getByKeyPath,
     setByKeyPath: setByKeyPath,

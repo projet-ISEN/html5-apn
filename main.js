@@ -12,11 +12,13 @@ let context = canvas.getContext('2d');
 let target = document.getElementById("target");
 let targetContext = target.getContext('2d');
 let dateField = document.getElementById("infos");
-var carouselselector = $(".carousel");
+let carouselselector = $(".carousel");
 /**
  * GPS position
  */
-var position = {};
+let position = {};
+let map = {};
+let mapMarkers = [];
 
 /**
  * Prevent bad things 
@@ -223,21 +225,25 @@ buildList = (data) => {
 /**
  * MAP Initialisation
  */
+window.onload = () => {
+    map = L.map('map').setView([46.498967, 2.418279], 6);
+    L.tileLayer('https://stamen-tiles-{s}.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors',
 
-let map = L.map('map').setView([51.505, -0.09], 13);
-let markers = [];
-/*L.tileLayer('https://{s}.tile.osm.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
-}).addTo(map);*/
-L.tileLayer('https://stamen-tiles-{s}.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors',
-
-}).addTo(map);
+    }).addTo(map);
+    for (marker of mapMarkers) {
+        marker.addTo(map);
+    }
+}
 
 addMarker = (lat, lng, content) => {
-    markers.push(
-        L.marker([lat, lng])
-        .addTo(map)
-        .bindPopup(content)
-        .openPopup());
+    let tmpMarker = L.marker([lat, lng])
+    .bindPopup( new L.popup({
+        minWidth: screen.width / 10,
+        closeButton: false
+    })
+    .setContent(content));
+
+    mapMarkers.push(tmpMarker);
+    tmpMarker.addTo(map);
 }
