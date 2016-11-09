@@ -12,11 +12,13 @@ let context = canvas.getContext('2d');
 let target = document.getElementById("target");
 let targetContext = target.getContext('2d');
 let dateField = document.getElementById("infos");
-var carouselselector = $(".carousel");
+let carouselselector = $(".carousel");
 /**
  * GPS position
  */
-var position = {};
+let position = {};
+let map = {};
+let mapMarkers = [];
 
 /**
  * Prevent bad things 
@@ -39,14 +41,6 @@ db.open().catch((e) => {
     console.error(e);
     dbOK = false;
 });
-
-/*db.pics.each((pic) => {
-    console.log(db.pics.count());
-    pics.push(pic);
-    refreshList();
-    carouselselector.append("<a class='carousel-item'><img src='"+pic.url+"'></a>");
-});*/
-
 
 db.pics.toArray( (pics) => {
     console.log(pics);
@@ -89,6 +83,11 @@ navigator.getUserMedia({
   console.error("Your browser doesn't support this feature", err);
 });
 
+/**
+ *
+ * @param {any} pic
+ * @param {any} left
+ */
 function addCarousel(pic,left){
     carouselselector.append("<a class='carousel-item'><img src='"+pic.url+"' long='"+pic.gps.long+"' lat='"+pic.gps.lat+"' alt='"+pic.gps.alt+"' date='"+pic.id+"' >");
     if(left){
@@ -131,6 +130,7 @@ shootButton.addEventListener("click", (e) => {
     
     // Update MAP
     addMarker(position.latitude, position.longitude, `<img src=\"${canvas.toDataURL()}\" />`);
+    map.flyTo(L.latLng(position.latitude, position.longitude));
 });
 
 /**
@@ -145,11 +145,9 @@ resetButton.addEventListener('click', (e) => {
     picDate.innerHTML = "";
 });
 
-
 saveButton.addEventListener('click', (e)=> {
     window.open(canvas.toDataURL(), '_TOP');
 });
-
 
 if (navigator.geolocation) {
         navigator.geolocation.watchPosition(
@@ -187,10 +185,13 @@ if (navigator.geolocation) {
 /**
  * Build a list based on items
  */
-refreshList = () => {
 
-}
-buildList = (data) => {
+/**
+ *
+ * @param {any} data
+ * @returns
+ */
+function buildList(data) {
     let i, item, ref = {}, counts = {};
     function ul() {
         return document.createElement('ul');
@@ -220,23 +221,47 @@ buildList = (data) => {
 
 
 /**
- * MAP Initialisation
+ * Initialisation
  */
+window.onload = () => {
 
-let map = L.map('map').setView([51.505, -0.09], 13);
-let markers = [];
-/*L.tileLayer('https://{s}.tile.osm.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
-}).addTo(map);*/
-L.tileLayer('https://stamen-tiles-{s}.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors',
+    // MAP
+    map = L.map('map').setView([46.498967, 2.418279], 6);
+    L.tileLayer('https://stamen-tiles-{s}.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors',
 
-}).addTo(map);
+    }).addTo(map);
+    for (marker of mapMarkers) {
+        marker.addTo(map);
+    }
 
-addMarker = (lat, lng, content) => {
-    markers.push(
-        L.marker([lat, lng])
-        .addTo(map)
-        .bindPopup(content)
-        .openPopup());
+    // SERVICE WORKER
+    if('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js', { scope: '/' })
+        .then((registration) => {
+            console.info('Service Worker Registered');
+        });
+        navigator.serviceWorker.ready.then((registration) => {
+            console.info('Service Worker Ready');
+        });
+    }
+}
+
+/**
+ * Add a marker on map
+ *
+ * @param float lat
+ * @param float lng
+ * @param string content
+ */
+function addMarker(lat, lng, content) {
+    let tmpMarker = L.marker([lat, lng])
+    .bindPopup( new L.popup({
+        minWidth: screen.width / 10,
+        closeButton: false
+    })
+    .setContent(content));
+
+    mapMarkers.push(tmpMarker);
+    tmpMarker.addTo(map);
 }
