@@ -50,7 +50,7 @@ db.pics.toArray( (pics) => {
         addMarker(pics[i].gps.lat, pics[i].gps.long, `<img src=\"${pics[i].url}\" />`)
         //pics.push(pics[i]);
     }
-      carouselselector.carousel({full_width: true});
+      carouselselector.carousel();
 
 } );
 
@@ -92,10 +92,19 @@ function addCarousel(pic,left){
     carouselselector.append("<a class='carousel-item'><img src='"+pic.url+"' long='"+pic.gps.long+"' lat='"+pic.gps.lat+"' alt='"+pic.gps.alt+"' date='"+pic.id+"' >");
     if(left){
     carouselselector.removeClass('initialized');
-    carouselselector.carousel({full_width: true});
+    carouselselector.carousel();
     carouselselector.carousel('prev');
     }
 }
+
+document.getElementsByClassName("carousel")[0].addEventListener("click", (e) => {
+    //alert("changement");
+    let target = $('.carousel-item').filter(function() {
+     return $(this).css('apacity') == '1';
+});
+    console.log(target.attr("src"));
+});
+
 
 /**
  * Trigger photo take
