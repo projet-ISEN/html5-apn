@@ -52,6 +52,7 @@ db.pics.toArray( (pics) => {
     console.log(pics);
     for(i=0;i<pics.length;i++){
         carouselselector.append("<a class='carousel-item'><img src='"+pics[i].url+"'></a>");
+        addMarker(pics[i].gps.lat, pics[i].gps.long, `<img src=\"${pics[i].url}\" />`)
         //pics.push(pics[i]);
     }
        $(document).ready(function(){
@@ -118,7 +119,7 @@ shootButton.addEventListener("click", (e) => {
     });
     
     // Update MAP
-    mapMarker.setLatLng(L.latLng(position.latitude, position.longitude));
+    addMarker(position.latitude, position.longitude, `<img src=\"${canvas.toDataURL()}\" />`);
 });
 
 /**
@@ -212,7 +213,7 @@ buildList = (data) => {
  */
 
 let map = L.map('map').setView([51.505, -0.09], 13);
-
+let markers = [];
 /*L.tileLayer('https://{s}.tile.osm.org/{z}/{x}/{y}.png', {
     attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
 }).addTo(map);*/
@@ -221,7 +222,10 @@ L.tileLayer('https://stamen-tiles-{s}.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.pn
 
 }).addTo(map);
 
-let mapMarker = L.marker([0, 0])
-.addTo(map)
-.bindPopup('Your pics was take here!')
-.openPopup();
+addMarker = (lat, lng, content) => {
+    markers.push(
+        L.marker([lat, lng])
+        .addTo(map)
+        .bindPopup(content)
+        .openPopup());
+}
