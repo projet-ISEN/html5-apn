@@ -62,18 +62,16 @@ navigator.getUserMedia({
   video: true,
   audio: false 
 }, (stream) => {
+
+    video.src = URL.createObjectURL(stream);
     let unitHeight = target.height / 8;
     let unitWidth  = target.width / 8;
-
-    streaming = true;
-    video.src = URL.createObjectURL(stream);
     targetContext.lineCap = 'round';
     targetContext.lineWidth = 3;
+    // Circle
     targetContext.beginPath();
     targetContext.arc(target.width / 2, target.height / 2, target.width / 8, 0, 2*Math.PI);
     targetContext.stroke();
-    console.log(unitWidth, unitHeight);
-
     // Vertical axes
     targetContext.moveTo(2*unitWidth, 4*unitHeight);
     targetContext.lineTo(3*unitWidth, 4*unitHeight);
@@ -245,16 +243,14 @@ window.onload = () => {
 
     // MAP
     map = L.map('map').setView([46.498967, 2.418279], 6);
-    L.tileLayer('https://stamen-tiles-{s}.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors',
-
-    }).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.se/hydda/full/{z}/{x}/{y}.png', {})
+    .addTo(map);
     for (marker of mapMarkers) {
         marker.addTo(map);
     }
 
     // SERVICE WORKER
-    /*if('serviceWorker' in navigator) {
+    if('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/sw.js', { 
             scope: '/',
             insecure: true 
@@ -265,7 +261,7 @@ window.onload = () => {
         navigator.serviceWorker.ready.then((registration) => {
             console.info('Service Worker Ready');
         });
-    }*/
+    }
 }
 
 /**
