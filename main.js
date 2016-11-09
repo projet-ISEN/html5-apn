@@ -52,13 +52,12 @@ db.pics.toArray( (pics) => {
     console.log(pics);
     for(i=0;i<pics.length;i++){
        addCarousel(pics[i],0);
-        carouselselector.append("<a class='carousel-item'><img src='"+pics[i].url+"'></a>");
+        //carouselselector.append("<a class='carousel-item'><img src='"+pics[i].url+"'></a>");
         addMarker(pics[i].gps.lat, pics[i].gps.long, `<img src=\"${pics[i].url}\" />`)
         //pics.push(pics[i]);
     }
-       $(document).ready(function(){
-      $('.carousel').carousel();
-    });
+      carouselselector.carousel({full_width: true});
+
 } );
 
 
@@ -93,9 +92,9 @@ navigator.getUserMedia({
 function addCarousel(pic,left){
     carouselselector.append("<a class='carousel-item'><img src='"+pic.url+"' long='"+pic.gps.long+"' lat='"+pic.gps.lat+"' alt='"+pic.gps.alt+"' date='"+pic.id+"' >");
     if(left){
-    $('.carousel').removeClass('initialized');
-    $('.carousel').carousel();
-    $('.carousel').carousel('prev');
+    carouselselector.removeClass('initialized');
+    carouselselector.carousel({full_width: true});
+    carouselselector.carousel('prev');
     }
 }
 
