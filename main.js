@@ -109,7 +109,7 @@ shootButton.addEventListener("click", (e) => {
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
     picLong.innerHTML = position.longitude;
     picLat.innerHTML = position.latitude;
-    picAlt.innerHTML = position.altitude;
+    //picAlt.innerHTML = position.altitude;
     picDate.innerHTML = now;
     //console.log(context.getImageData(0, 0, canvas.width, canvas.height));
     var temp=  {
