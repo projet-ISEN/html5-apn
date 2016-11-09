@@ -7,6 +7,7 @@
 		<!-- Compiled and minified CSS -->
 		<link rel="stylesheet" href="./css/materialize.min.css">
 		<link rel="stylesheet" href="./css/default.css">
+		<link rel="stylesheet" href="./leaflet.css">
 		<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 	</head>
 	<body>
@@ -74,14 +75,18 @@
 				<a  id="reset" class="waves-effect waves-light btn-large"><i class="material-icons right">clear_all</i>Reset</a>
                 </div>
 			</div>
+			<div class="row">
+				<div id="map"></div>
+			</div>
 
         <footer class="row valign-wrapper">
             <div class="center-align valign">Collignon Rémi et Riouallon Vincent</div>
 
         </footer>
 
-		<script rel="application/javascript" src="./dexie.js" ></script>		<script src="./jquery-3.1.1.min.js"></script>
-
+			<script rel="application/javascript" src="./dexie.js" ></script>		
+			<script src="./jquery-3.1.1.min.js"></script>
+			<script src="./leaflet.js"></script>
 			<script src="./materialize.min.js"></script>
 
 		<script src="./main.js"></script>
