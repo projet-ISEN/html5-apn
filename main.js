@@ -63,22 +63,31 @@ navigator.getUserMedia({
   video: true,
   audio: false 
 }, (stream) => {
+    let unitHeight = target.height / 8;
+    let unitWidth  = target.width / 8;
 
     streaming = true;
     video.src = URL.createObjectURL(stream);
+    targetContext.lineCap = 'round';
+    targetContext.lineWidth = 3;
     targetContext.beginPath();
-    targetContext.arc(target.width / 2, target.height / 2, target.width / 8, 0, 2 * Math.PI);
-    targetContext.lineWidth = 4;
+    targetContext.arc(target.width / 2, target.height / 2, target.width / 8, 0, 2*Math.PI);
     targetContext.stroke();
+    console.log(unitWidth, unitHeight);
 
-    targetContext.beginPath();
-    targetContext.moveTo(target.width / 4, target.height / 2);
-    targetContext.lineTo(target.width / 4 + target.width / 2, target.height / 2);
+    // Vertical axes
+    targetContext.moveTo(2*unitWidth, 4*unitHeight);
+    targetContext.lineTo(3*unitWidth, 4*unitHeight);
     targetContext.stroke();
-
-    targetContext.beginPath();
-    targetContext.moveTo(target.width / 2, target.height / 4);
-    targetContext.lineTo(target.width / 2, target.height / 4 + target.height / 2);
+    targetContext.moveTo(5*unitWidth, 4*unitHeight);
+    targetContext.lineTo(6*unitWidth, 4*unitHeight);
+    targetContext.stroke();
+    // Horizontal axes
+    targetContext.moveTo(4*unitWidth, 2*unitHeight);
+    targetContext.lineTo(4*unitWidth, 3*unitHeight);
+    targetContext.stroke();
+    targetContext.moveTo(4*unitWidth, 5*unitHeight);
+    targetContext.lineTo(4*unitWidth, 6*unitHeight);
     targetContext.stroke();
 }, (err) => {
   console.error("Your browser doesn't support this feature", err);
@@ -237,15 +246,18 @@ window.onload = () => {
     }
 
     // SERVICE WORKER
-    if('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js', { scope: '/' })
+    /*if('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js', { 
+            scope: '/',
+            insecure: true 
+        })
         .then((registration) => {
             console.info('Service Worker Registered');
         });
         navigator.serviceWorker.ready.then((registration) => {
             console.info('Service Worker Ready');
         });
-    }
+    }*/
 }
 
 /**
