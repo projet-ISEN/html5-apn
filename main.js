@@ -89,7 +89,7 @@ navigator.getUserMedia({
 });
 
 function addCarousel(pic,left){
-    carouselselector.append("<a class='carousel-item'><img src='"+pic.url+"'>");
+    carouselselector.append("<a class='carousel-item'><img src='"+pic.url+"' long='"+pic.gps.long+"' lat='"+pic.gps.lat+"' alt='"+pic.gps.alt+"' date='"+pic.id+"' >");
     if(left){
     $('.carousel').removeClass('initialized');
     $('.carousel').carousel();
@@ -103,25 +103,26 @@ function addCarousel(pic,left){
 shootButton.addEventListener("click", (e) => {
 	
     // Display
-    let now = new Date();
+    let now = Math.round(Date.now()/1000);
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
     picLong.innerHTML = position.longitude;
     picLat.innerHTML = position.latitude;
     picAlt.innerHTML = position.altitude;
     picDate.innerHTML = now;
     //console.log(context.getImageData(0, 0, canvas.width, canvas.height));
-    var temp=  {url:canvas.toDataURL().toString()};
-    addCarousel(temp,1);
-    // STORE PICS
-    db.pics.put({
-        id: Date.now(now.getTime()),
+    var temp=  {
+        id: now,
         url: canvas.toDataURL(), // context.getImageData(0, 0, canvas.width, canvas.height),
         gps: {
             long: position.longitude,
             lat: position.latitude,
             alt: position.altitude
         }
-    }).then(() => {
+        };
+
+    addCarousel(temp,1);
+    // STORE PICS
+    db.pics.put(temp).then(() => {
         console.info('Image stored');
     }).catch((err) =>  {
         console.error(error);
