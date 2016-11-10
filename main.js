@@ -123,12 +123,9 @@ function addCarousel(pic,left){
 
 document.getElementsByClassName("carousel")[0].addEventListener("click", (e) => {
     //alert("changement");
-    let target = $('.carousel-item').filter(function() {
-                //console.log($(this).css('opacity'));
-
-     return $(this).css('opacity') == '1';
-});
-    console.log(target.children("img").attr("date"));
+    let target = $('.indicator-item.active');
+    console.log($( ".indicators" ).index( target ));
+    //console.log(target.children("img").attr("date"));
 });
 
 
