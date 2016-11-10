@@ -18,6 +18,9 @@ let position = {};
 let map = {};
 let mapMarkers = [];
 
+/**
+ * Canvas 
+ */
 let stateStream = true;
 let lastImageRedraw = false;
 
@@ -36,26 +39,25 @@ db.open().catch((e) => {
     dbOK = false;
 });
 
+/**
+ * Load Caroussel and Map with pictures
+ */
 db.pics.toArray( (pics) => {
-    console.log(pics);
     for(i=0;i<pics.length;i++){
-       addCarousel(pics[i],0);
-        //carouselselector.append("<a class='carousel-item'><img src='"+pics[i].url+"'></a>");
+        addCarousel(pics[i],0);
         addMarker(pics[i].gps.lat, pics[i].gps.long, `<img src=\"${pics[i].url}\" />`)
-        //pics.push(pics[i]);
     }
-      carouselselector.carousel({indicators:true});
-
-} );
+    carouselselector.carousel({indicators:true});
+});
 
 /**
- * 
+ * Draw a target on canvas
  */
 function drawTarget() {
-    let unitHeight = canvas.height / 8;
-    let unitWidth  = canvas.width / 8;
-    context.lineCap = 'round';
-    context.lineWidth = 3;
+    let unitWidth       = canvas.width / 8;
+    let unitHeight      = canvas.height / 8;
+    context.lineCap     = 'round';
+    context.lineWidth   = 3;
     // Circle
     context.beginPath();
     context.arc(canvas.width / 2, canvas.height / 2, canvas.width / 8, 0, 2*Math.PI);
@@ -81,14 +83,28 @@ function drawTarget() {
  * Request and start Camera 
  */
 navigator.getUserMedia({ 
-  video: true,
-  audio: false 
+  audio: false,
+  video: {
+    width: { 
+        min: 400, 
+        ideal: 600, 
+        max: 800 
+    },
+    height: { 
+        min: 400, 
+        ideal: 600, 
+        max: 800 
+    },
+  }
 }, (stream) => {
     video.src = URL.createObjectURL(stream);
 }, (err) => {
   console.error("Your browser doesn't support this feature", err);
 });
 
+/**
+ * draw Camera stream on canvas, add the target, freeze if photo is taken
+ */
 function drawCamera() {
     if(stateStream) {
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -101,8 +117,6 @@ function drawCamera() {
     }
     window.requestAnimationFrame(drawCamera);
 }
-
-window.requestAnimationFrame(drawCamera);
 
 
 function refreshCarousel(){
@@ -135,6 +149,13 @@ function addCarousel(pic,left){
     }
 }
 
+/**
+ * EVENT ZONE 
+ */
+
+/**
+ * When you click on pic in Caroussel
+ */
 document.getElementsByClassName("carousel")[0].addEventListener("click", (e) => {
     //alert("changement");
     let target = $('.indicator-item.active').index();
@@ -142,12 +163,10 @@ document.getElementsByClassName("carousel")[0].addEventListener("click", (e) => 
     //console.log(target.children("img").attr("date"));
 });
 
-
 /**
- * Trigger photo take
+ * When a photo taken
  */
 shootButton.addEventListener("click", (e) => {
-	
     // Display
     stateStream = false;
     let now = Date.now();
@@ -165,16 +184,16 @@ shootButton.addEventListener("click", (e) => {
             lat: position.latitude,
             alt: position.altitude
         }
-        };
-
+    };
     // STORE PICS
     db.pics.put(temp).then(() => {
         console.info('Image stored');
     }).catch((err) =>  {
         console.error(error);
     });
-    
-        refreshCarousel(temp,1);
+
+    // Update Caroussel
+    refreshCarousel(temp,1);
 
     // Update MAP
     addMarker(position.latitude, position.longitude, `<img src=\"${canvas.toDataURL()}\" />`);
@@ -182,11 +201,9 @@ shootButton.addEventListener("click", (e) => {
 });
 
 /**
- * Trigger photo reset
+ * When photo is reset
  */
 resetButton.addEventListener('click', (e) => {
-
-    //context.clearRect(0, 0, canvas.width, canvas.height);
     stateStream = true;
     lastImageRedraw = false;
     picLong.innerHTML = "";
@@ -195,42 +212,12 @@ resetButton.addEventListener('click', (e) => {
     picDate.innerHTML = "";
 });
 
+/**
+ * When you want to save a photo
+ */
 saveButton.addEventListener('click', (e)=> {
     window.open(canvas.toDataURL(), '_TOP');
 });
-
-if (navigator.geolocation) {
-        navigator.geolocation.watchPosition(
-            (pos) => {
-                // pos.latitude	The latitude as a decimal number (always returned)
-                // pos.longitude	The longitude as a decimal number (always returned)
-                // pos.accuracy	The accuracy of position (always returned)
-                // pos.altitude	The altitude in meters above the mean sea level (returned if available)
-                // pos.altitudeAccuracy	The altitude accuracy of position (returned if available)
-                // pos.heading	The heading as degrees clockwise from North (returned if available)
-                // pos.speed The speed in meters per second (returned if available)
-                console.log(pos);
-                position = pos.coords;
-            }, (err) => {
-          switch(err.code) {
-            case err.PERMISSION_DENIED:
-                console.error("User denied the request for Geolocation.");
-                break;
-            case err.POSITION_UNAVAILABLE:
-                console.error("Location information is unavailable.");
-                break;
-            case err.TIMEOUT:
-                console.error("The request to get user location timed out.");
-                break;
-            case err.UNKNOWN_ERROR:
-                console.error("An unknown error occurred.");
-                break;
-        }
-        });
-        //console.log(navigator.geolocation.getCurrentPosition((pos) => {console.log(pos)}, (err) => {console.log(err)}));
-} else {
-  console.error("Your browser doesn't support this feature");
-}
 
 /**
  * Build a list based on items
@@ -269,6 +256,36 @@ function buildList(data) {
     return ref[0];
 }
 
+/**
+ * Add a marker on map
+ *
+ * @param float lat
+ * @param float lng
+ * @param string content
+ */
+function addMarker(lat, lng, content) {
+    let tmpMarker = L.marker([lat, lng])
+    .bindPopup( new L.popup({
+        minWidth: screen.width / 10,
+        closeButton: false
+    })
+    .setContent(content));
+    mapMarkers.push(tmpMarker);
+    tmpMarker.addTo(map);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /**
  * Initialisation
@@ -281,6 +298,41 @@ window.onload = () => {
     .addTo(map);
     for (marker of mapMarkers) {
         marker.addTo(map);
+    }
+    // CAMERA TO Canvas
+    window.requestAnimationFrame(drawCamera);
+
+    // Start to watch GPS position
+    if (navigator.geolocation) {
+        navigator.geolocation.watchPosition( (pos) => {
+            // pos.latitude	The latitude as a decimal number (always returned)
+            // pos.longitude	The longitude as a decimal number (always returned)
+            // pos.accuracy	The accuracy of position (always returned)
+            // pos.altitude	The altitude in meters above the mean sea level (returned if available)
+            // pos.altitudeAccuracy	The altitude accuracy of position (returned if available)
+            // pos.heading	The heading as degrees clockwise from North (returned if available)
+            // pos.speed The speed in meters per second (returned if available)
+            //console.log(pos);
+            position = pos.coords;
+        }, (err) => {
+            switch(err.code) {
+                case err.PERMISSION_DENIED:
+                    console.error("User denied the request for Geolocation.");
+                    break;
+                case err.POSITION_UNAVAILABLE:
+                    console.error("Location information is unavailable.");
+                    break;
+                case err.TIMEOUT:
+                    console.error("The request to get user location timed out.");
+                    break;
+                case err.UNKNOWN_ERROR:
+                    console.error("An unknown error occurred.");
+                    break;
+            }
+        });
+    } 
+    else {
+    console.error("Your browser doesn't support this feature");
     }
 
     // SERVICE WORKER
@@ -318,23 +370,4 @@ window.onload = () => {
     });*/
 
     // TRACKING V2
-}
-
-/**
- * Add a marker on map
- *
- * @param float lat
- * @param float lng
- * @param string content
- */
-function addMarker(lat, lng, content) {
-    let tmpMarker = L.marker([lat, lng])
-    .bindPopup( new L.popup({
-        minWidth: screen.width / 10,
-        closeButton: false
-    })
-    .setContent(content));
-
-    mapMarkers.push(tmpMarker);
-    tmpMarker.addTo(map);
 }
