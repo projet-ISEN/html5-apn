@@ -1,6 +1,6 @@
 // Grab elements, create settings, etc.
-let video = document.getElementById('video');
 let canvas = document.getElementById('canvas');
+let video = document.getElementById('video');
 let shootButton = document.getElementById("shoot");
 let resetButton = document.getElementById("reset");
 let saveButton = document.getElementById("save");
@@ -9,8 +9,6 @@ let picLat = document.getElementById("picLat");
 let picAlt = document.getElementById("picAlt");
 let picDate = document.getElementById("picDate");
 let context = canvas.getContext('2d');
-let target = document.getElementById("target");
-let targetContext = target.getContext('2d');
 let dateField = document.getElementById("infos");
 let carouselselector = $(".carousel");
 /**
@@ -20,12 +18,8 @@ let position = {};
 let map = {};
 let mapMarkers = [];
 
-/**
- * Prevent bad things 
- */
-video.addEventListener('canplay', (event) => {
-    event.preventDefault();
-});
+let stateStream = true;
+let lastImageRedraw = false;
 
 /**
  * Init DB
@@ -54,6 +48,34 @@ db.pics.toArray( (pics) => {
 
 } );
 
+/**
+ * 
+ */
+function drawTarget() {
+    let unitHeight = canvas.height / 8;
+    let unitWidth  = canvas.width / 8;
+    context.lineCap = 'round';
+    context.lineWidth = 3;
+    // Circle
+    context.beginPath();
+    context.arc(canvas.width / 2, canvas.height / 2, canvas.width / 8, 0, 2*Math.PI);
+    context.stroke();
+    // Vertical axes
+    context.moveTo(2*unitWidth, 4*unitHeight);
+    context.lineTo(3*unitWidth, 4*unitHeight);
+    context.stroke();
+    context.moveTo(5*unitWidth, 4*unitHeight);
+    context.lineTo(6*unitWidth, 4*unitHeight);
+    context.stroke();
+    // Horizontal axes
+    context.moveTo(4*unitWidth, 2*unitHeight);
+    context.lineTo(4*unitWidth, 3*unitHeight);
+    context.stroke();
+    context.moveTo(4*unitWidth, 5*unitHeight);
+    context.lineTo(4*unitWidth, 6*unitHeight);
+    context.stroke();
+}
+
 
 /**
  * Request and start Camera 
@@ -64,31 +86,27 @@ navigator.getUserMedia({
 }, (stream) => {
 
     video.src = URL.createObjectURL(stream);
-    let unitHeight = target.height / 8;
-    let unitWidth  = target.width / 8;
-    targetContext.lineCap = 'round';
-    targetContext.lineWidth = 3;
-    // Circle
-    targetContext.beginPath();
-    targetContext.arc(target.width / 2, target.height / 2, target.width / 8, 0, 2*Math.PI);
-    targetContext.stroke();
-    // Vertical axes
-    targetContext.moveTo(2*unitWidth, 4*unitHeight);
-    targetContext.lineTo(3*unitWidth, 4*unitHeight);
-    targetContext.stroke();
-    targetContext.moveTo(5*unitWidth, 4*unitHeight);
-    targetContext.lineTo(6*unitWidth, 4*unitHeight);
-    targetContext.stroke();
-    // Horizontal axes
-    targetContext.moveTo(4*unitWidth, 2*unitHeight);
-    targetContext.lineTo(4*unitWidth, 3*unitHeight);
-    targetContext.stroke();
-    targetContext.moveTo(4*unitWidth, 5*unitHeight);
-    targetContext.lineTo(4*unitWidth, 6*unitHeight);
-    targetContext.stroke();
+    video.play();
+
 }, (err) => {
   console.error("Your browser doesn't support this feature", err);
 });
+
+function drawCamera() {
+    window.requestAnimationFrame(drawCamera);
+    if(stateStream) {
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        drawTarget();
+    } else {
+        if (!lastImageRedraw) {
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            lastImageRedraw = true;
+        }
+    }
+}
+
+window.requestAnimationFrame(drawCamera);
 
 /**
  *
@@ -119,8 +137,9 @@ document.getElementsByClassName("carousel")[0].addEventListener("click", (e) => 
 shootButton.addEventListener("click", (e) => {
 	
     // Display
-    let now = Math.round(Date.now()/1000);
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    stateStream = false;
+    let now = Date.now();
+    context.drawImage(video, 0, 0, video.width, video.height);
     picLong.innerHTML = position.longitude;
     picLat.innerHTML = position.latitude;
     //picAlt.innerHTML = position.altitude;
@@ -154,7 +173,8 @@ shootButton.addEventListener("click", (e) => {
  */
 resetButton.addEventListener('click', (e) => {
 
-    context.clearRect(0, 0, canvas.width, canvas.height);
+    //context.clearRect(0, 0, canvas.width, canvas.height);
+    stateStream = true;
     picLong.innerHTML = "";
     picLat.innerHTML = "";
     picAlt.innerHTML = "";
@@ -250,7 +270,7 @@ window.onload = () => {
     }
 
     // SERVICE WORKER
-    if('serviceWorker' in navigator) {
+    /*if('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/sw.js', { 
             scope: '/',
             insecure: true 
@@ -261,7 +281,7 @@ window.onload = () => {
         navigator.serviceWorker.ready.then((registration) => {
             console.info('Service Worker Ready');
         });
-    }
+    }*/
 }
 
 /**
@@ -282,3 +302,9 @@ function addMarker(lat, lng, content) {
     mapMarkers.push(tmpMarker);
     tmpMarker.addTo(map);
 }
+
+function resize() {
+    //canvas.width = document.getElementById('canvasRow').width();
+}
+window.onersize = resize;
+resize();
