@@ -40,17 +40,6 @@ db.open().catch((e) => {
 });
 
 /**
- * Load Caroussel and Map with pictures
- */
-db.pics.toArray( (pics) => {
-    for(i=0;i<pics.length;i++){
-        addCarousel(pics[i],0);
-        addMarker(pics[i].gps.lat, pics[i].gps.long, `<img src=\"${pics[i].url}\" />`)
-    }
-    carouselselector.carousel({indicators:true});
-});
-
-/**
  * Draw a target on canvas
  */
 function drawTarget() {
@@ -332,8 +321,19 @@ window.onload = () => {
         });
     } 
     else {
-    console.error("Your browser doesn't support this feature");
+        console.error("Your browser doesn't support this feature");
     }
+
+    /**
+     * Load Caroussel and Map with pictures
+     */
+    db.pics.toArray( (pics) => {
+        for(i=0;i<pics.length;i++){
+            addCarousel(pics[i],0);
+            addMarker(pics[i].gps.lat, pics[i].gps.long, `<img src=\"${pics[i].url}\" />`)
+        }
+        carouselselector.carousel({indicators:true});
+    });
 
     // SERVICE WORKER
     /*if('serviceWorker' in navigator) {
