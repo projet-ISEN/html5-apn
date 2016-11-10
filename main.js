@@ -119,10 +119,8 @@ function refreshCarousel(){
         for(i=0;i<pics.length;i++){
            addCarousel(pics[i],0);
         }
-          carouselselector.carousel({indicators:true});
-
-            carouselselector.carousel('prev');
-
+        carouselselector.carousel({indicators:true});
+        carouselselector.carousel('prev');
     });
 }
 
