@@ -126,13 +126,13 @@ function refreshCarousel(){
 
 /**
  *
- * @param {any} pic
- * @param {any} left
+ * @param Object pic
+ * @param Number left
  */
 function addCarousel(pic,left){
     carouselselector.append("<a class='carousel-item'><img src='"+pic.url+"' long='"+pic.gps.long+"' lat='"+pic.gps.lat+"' alt='"+pic.gps.alt+"' date='"+pic.id+"' >");
-    if(left){
-    refreshCarousel();
+    if (left) {
+        refreshCarousel();
     }
 }
 
@@ -146,7 +146,8 @@ function addCarousel(pic,left){
 document.getElementsByClassName("carousel")[0].addEventListener("click", (e) => {
     //alert("changement");
     let target = $('.indicator-item.active').index();
-    console.log(target );
+    console.log(target);
+                                                // console.log($('.indicator-item.active').attr()); ?????
     //console.log(target.children("img").attr("date"));
 });
 
