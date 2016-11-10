@@ -123,8 +123,8 @@ function addCarousel(pic,left){
 
 document.getElementsByClassName("carousel")[0].addEventListener("click", (e) => {
     //alert("changement");
-    let target = $('.indicator-item.active');
-    console.log($( ".indicators" ).index( target ));
+    let target = $('.indicator-item.active').index();
+    console.log(target );
     //console.log(target.children("img").attr("date"));
 });
 
