@@ -41,8 +41,18 @@ video {
     display: flex;
     justify-content: center;
 }
+    .col.s12{
+        display: flex;
+        justify-content: center;
+    }
+.indicators{
+    display:   none;
+}
+
 
 /*nav*/
+
+
 nav, footer{
     height: 3rem;
     width: 100%;

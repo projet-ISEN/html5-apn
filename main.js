@@ -44,7 +44,7 @@ db.pics.toArray( (pics) => {
         addMarker(pics[i].gps.lat, pics[i].gps.long, `<img src=\"${pics[i].url}\" />`)
         //pics.push(pics[i]);
     }
-      carouselselector.carousel();
+      carouselselector.carousel({indicators:true});
 
 } );
 
@@ -108,6 +108,25 @@ function drawCamera() {
 
 window.requestAnimationFrame(drawCamera);
 
+
+function refreshCarousel(){
+    $(".carousel").empty();
+    carouselselector.removeClass('initialized');
+
+    $(".indicators").remove();
+
+    db.pics.toArray( (pics) => {
+        console.log(pics);
+        for(i=0;i<pics.length;i++){
+           addCarousel(pics[i],0);
+        }
+          carouselselector.carousel({indicators:true});
+
+            carouselselector.carousel('prev');
+
+    });
+}
+
 /**
  *
  * @param {any} pic
@@ -116,18 +135,15 @@ window.requestAnimationFrame(drawCamera);
 function addCarousel(pic,left){
     carouselselector.append("<a class='carousel-item'><img src='"+pic.url+"' long='"+pic.gps.long+"' lat='"+pic.gps.lat+"' alt='"+pic.gps.alt+"' date='"+pic.id+"' >");
     if(left){
-    carouselselector.removeClass('initialized');
-    carouselselector.carousel();
-    carouselselector.carousel('prev');
+    refreshCarousel();
     }
 }
 
 document.getElementsByClassName("carousel")[0].addEventListener("click", (e) => {
     //alert("changement");
-    let target = $('.carousel-item').filter(function() {
-     return $(this).css('apacity') == '1';
-});
-    console.log(target.attr("src"));
+    let target = $('.indicator-item.active').index();
+    console.log(target );
+    //console.log(target.children("img").attr("date"));
 });
 
 
@@ -155,7 +171,6 @@ shootButton.addEventListener("click", (e) => {
         }
         };
 
-    addCarousel(temp,1);
     // STORE PICS
     db.pics.put(temp).then(() => {
         console.info('Image stored');
@@ -163,6 +178,8 @@ shootButton.addEventListener("click", (e) => {
         console.error(error);
     });
     
+        refreshCarousel(temp,1);
+
     // Update MAP
     addMarker(position.latitude, position.longitude, `<img src=\"${canvas.toDataURL()}\" />`);
     map.flyTo(L.latLng(position.latitude, position.longitude));
