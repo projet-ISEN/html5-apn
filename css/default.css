@@ -22,7 +22,6 @@ height: 35rem;
         right: 0;
       }*/
 #canvas {
-    /*position: absolute;*/
     top: 0;
     height: 100%;
     text-align: center;
@@ -30,9 +29,9 @@ height: 35rem;
 video {
     display: none;
 }
-      .row, .col.s12 {
-        position: relative;
-      }
+.row, .col.s12 {
+    position: relative;
+}
 .main{
     position: relative;
 }
@@ -40,15 +39,12 @@ video {
 .col.s12{
     display: flex;
     justify-content: center;
+    display: flex;
+    justify-content: center;
 }
-    .col.s12{
-        display: flex;
-        justify-content: center;
-    }
 .indicators{
     display:   none;
 }
-
 
 /*nav*/
 

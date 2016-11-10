@@ -84,18 +84,13 @@ navigator.getUserMedia({
   video: true,
   audio: false 
 }, (stream) => {
-
     video.src = URL.createObjectURL(stream);
-    video.play();
-
 }, (err) => {
   console.error("Your browser doesn't support this feature", err);
 });
 
 function drawCamera() {
-    window.requestAnimationFrame(drawCamera);
     if(stateStream) {
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
         drawTarget();
     } else {
@@ -104,6 +99,7 @@ function drawCamera() {
             lastImageRedraw = true;
         }
     }
+    window.requestAnimationFrame(drawCamera);
 }
 
 window.requestAnimationFrame(drawCamera);
@@ -192,6 +188,7 @@ resetButton.addEventListener('click', (e) => {
 
     //context.clearRect(0, 0, canvas.width, canvas.height);
     stateStream = true;
+    lastImageRedraw = false;
     picLong.innerHTML = "";
     picLat.innerHTML = "";
     picAlt.innerHTML = "";
@@ -299,6 +296,28 @@ window.onload = () => {
             console.info('Service Worker Ready');
         });
     }*/
+
+    // TRACKING V1
+
+    /*let tracker = new tracking.ObjectTracker(['face']);
+    tracker.setInitialScale(1);
+    tracker.setStepSize(2);
+    tracker.setEdgesDensity(0.1);
+    tracking.track('#video', tracker, {camera: true});
+    tracker.on('track', (e) => {
+        //context.clearRect(0, 0, canvas.width, canvas.height);
+        e.data.forEach((rect) => {
+            /*context.strokeStyle = '#a64ceb';
+            context.strokeRect(rect.x, rect.y, rect.width, rect.height);
+            context.font = '11px Helvetica';
+            context.fillStyle = "#fff";
+            context.fillText('x: ' + rect.x + 'px', rect.x + rect.width + 5, rect.y + 11);
+            context.fillText('y: ' + rect.y + 'px', rect.x + rect.width + 5, rect.y + 22);
+            console.log(rect);
+        });
+    });*/
+
+    // TRACKING V2
 }
 
 /**
@@ -319,9 +338,3 @@ function addMarker(lat, lng, content) {
     mapMarkers.push(tmpMarker);
     tmpMarker.addTo(map);
 }
-
-function resize() {
-    //canvas.width = document.getElementById('canvasRow').width();
-}
-window.onersize = resize;
-resize();
