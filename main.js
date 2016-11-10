@@ -63,21 +63,28 @@ navigator.getUserMedia({
   audio: false 
 }, (stream) => {
 
-    streaming = true;
     video.src = URL.createObjectURL(stream);
+    let unitHeight = target.height / 8;
+    let unitWidth  = target.width / 8;
+    targetContext.lineCap = 'round';
+    targetContext.lineWidth = 3;
+    // Circle
     targetContext.beginPath();
-    targetContext.arc(target.width / 2, target.height / 2, target.width / 8, 0, 2 * Math.PI);
-    targetContext.lineWidth = 4;
+    targetContext.arc(target.width / 2, target.height / 2, target.width / 8, 0, 2*Math.PI);
     targetContext.stroke();
-
-    targetContext.beginPath();
-    targetContext.moveTo(target.width / 4, target.height / 2);
-    targetContext.lineTo(target.width / 4 + target.width / 2, target.height / 2);
+    // Vertical axes
+    targetContext.moveTo(2*unitWidth, 4*unitHeight);
+    targetContext.lineTo(3*unitWidth, 4*unitHeight);
     targetContext.stroke();
-
-    targetContext.beginPath();
-    targetContext.moveTo(target.width / 2, target.height / 4);
-    targetContext.lineTo(target.width / 2, target.height / 4 + target.height / 2);
+    targetContext.moveTo(5*unitWidth, 4*unitHeight);
+    targetContext.lineTo(6*unitWidth, 4*unitHeight);
+    targetContext.stroke();
+    // Horizontal axes
+    targetContext.moveTo(4*unitWidth, 2*unitHeight);
+    targetContext.lineTo(4*unitWidth, 3*unitHeight);
+    targetContext.stroke();
+    targetContext.moveTo(4*unitWidth, 5*unitHeight);
+    targetContext.lineTo(4*unitWidth, 6*unitHeight);
     targetContext.stroke();
 }, (err) => {
   console.error("Your browser doesn't support this feature", err);
@@ -256,17 +263,18 @@ window.onload = () => {
 
     // MAP
     map = L.map('map').setView([46.498967, 2.418279], 6);
-    L.tileLayer('https://stamen-tiles-{s}.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors',
-
-    }).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.se/hydda/full/{z}/{x}/{y}.png', {})
+    .addTo(map);
     for (marker of mapMarkers) {
         marker.addTo(map);
     }
 
     // SERVICE WORKER
     if('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js', { scope: '/' })
+        navigator.serviceWorker.register('/sw.js', { 
+            scope: '/',
+            insecure: true 
+        })
         .then((registration) => {
             console.info('Service Worker Registered');
         });
