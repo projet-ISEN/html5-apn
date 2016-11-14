@@ -69,6 +69,11 @@ function drawTarget() {
 }
 
 
+
+function addCard(pic){
+    cardselector.append("<div class='col s6 m3 l3'><div class='card'><div class='card-image waves-effect waves-block waves-light'><img class='activator' src='"+pic.url+"'><span class='card-title'>"+(new Date(pic.id)).toLocaleString(navigator.language)+"</span></div><div class='card-reveal'><span class='card-title grey-text text-darken-4'><i class='material-icons right'>close</i></span><p>Long. : "+pic.gps.long+"</br>Lat. : "+pic.gps.lat+"</p></div></div></div>");
+}
+
 /**
  * Request and start Camera
  */
@@ -120,7 +125,7 @@ shootButton.addEventListener("click", (e) => {
     picLong.value = position.longitude;
     picLat.value = position.latitude;
     //picAlt.innerHTML = position.altitude;
-    picDate.innerHTML = now;
+    picDate.value = (new Date(now)).toLocaleString(navigator.language);
     //console.log(context.getImageData(0, 0, canvas.width, canvas.height));
     var temp=  {
         id: now,
@@ -138,7 +143,7 @@ shootButton.addEventListener("click", (e) => {
         console.error(error);
     });
 
-
+    addCard(temp);
     // Update MAP
     addMarker(position.latitude, position.longitude, `<img src=\"${canvas.toDataURL()}\" />`);
     map.flyTo(L.latLng(position.latitude, position.longitude));
@@ -150,10 +155,10 @@ shootButton.addEventListener("click", (e) => {
 resetButton.addEventListener('click', (e) => {
     stateStream = true;
     lastImageRedraw = false;
-    picLong.innerHTML = "";
-    picLat.innerHTML = "";
-    picAlt.innerHTML = "";
-    picDate.innerHTML = "";
+    picLong.value = "";
+    picLat.value = "";
+    picAlt.value = "";
+    picDate.value = "";
 });
 
 /**
@@ -321,11 +326,12 @@ window.onload = () => {
     }
 
 
+
 db.pics.each( (pic) => {
     //addCarousel(pics[i],0);
     //carouselselector.append("<a class='carousel-item'><img src='"+pics[i].url+"'></a>");
     //cardselector.append("<div class='col s6 m3 l3'><div class='card'><div class='card-image'><img src='"+pics[i].url+"'><span class='card-title'>"+pics[i].id+"</span></div></div></div>");
-    cardselector.append("<div class='col s6 m3 l3'><div class='card'><div class='card-image waves-effect waves-block waves-light'><img class='activator' src='"+pic.url+"'><span class='card-title'>"+(new Date(pic.id)).toLocaleString(navigator.language)+"</span></div><div class='card-reveal'><span class='card-title grey-text text-darken-4'><i class='material-icons right'>close</i></span><p>Long. : "+pic.gps.long+"</br>Lat. : "+pic.gps.lat+"</p></div></div></div>");
+    addCard(pic);
     addMarker(pic.gps.lat, pic.gps.long, `<img src=\"${pic.url}\" />`)
     //pics.push(pics[i]);
       //carouselselector.carousel({indicators:true});
