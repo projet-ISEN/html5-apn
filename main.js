@@ -75,7 +75,7 @@ function drawTarget() {
  * @param Object pic
  */
 function addCard(pic){
-    cardselector.append("<div class='col s6 m3 l3' id='"+pic.id+"'><div class='card'><div class='card-image waves-effect waves-block waves-light'><i class='material-icons devare-card' onclick='devarePic("+pic.id+")'>devare</i><i class='material-icons download-card' onclick=\"downloadCard('"+pic.url+"')\">play_for_work</i><img class='activator' src='"+pic.url+"'><span class='card-title'>"+(new Date(pic.id)).toLocaleString(navigator.language)+"</span></div><div class='card-reveal'><span class='card-title grey-text text-darken-4'><i class='material-icons right'>close</i></span><p>Long. : "+pic.gps.long+"</br>Lat. : "+pic.gps.lat+"</p></div></div></div>");
+    cardselector.append("<div class='col s6 m3 l3' id='"+pic.id+"'><div class='card'><div class='card-image waves-effect waves-block waves-light'><i class='material-icons delete-card' onclick='devarePic("+pic.id+")'>devare</i><i class='material-icons download-card' onclick=\"downloadCard('"+pic.url+"')\">play_for_work</i><img class='activator' src='"+pic.url+"'><span class='card-title'>"+(new Date(pic.id)).toLocaleString(navigator.language)+"</span></div><div class='card-reveal'><span class='card-title grey-text text-darken-4'><i class='material-icons right'>close</i></span><p>Long. : "+pic.gps.long+"</br>Lat. : "+pic.gps.lat+"</p></div></div></div>");
 }
 
 /**
