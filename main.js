@@ -329,7 +329,7 @@ db.pics.toArray( (pics) => {
        //addCarousel(pics[i],0);
         //carouselselector.append("<a class='carousel-item'><img src='"+pics[i].url+"'></a>");
         //cardselector.append("<div class='col s6 m3 l3'><div class='card'><div class='card-image'><img src='"+pics[i].url+"'><span class='card-title'>"+pics[i].id+"</span></div></div></div>");
-        cardselector.append("<div class='col s6 m3 l3'><div class='card'><div class='card-image waves-effect waves-block waves-light'><img class='activator' src='"+pics[i].url+"'><span class='card-title'>"+(new Date(pics[i].id*1000)).toLocaleString(navigator.language)+"</span></div><div class='card-reveal'><span class='card-title grey-text text-darken-4'><i class='material-icons right'>close</i></span><p>Long. : "+pics[i].gps.long+"</br>Lat. : "+pics[i].gps.lat+"</p></div></div></div>");
+        cardselector.append("<div class='col s6 m3 l3'><div class='card'><div class='card-image waves-effect waves-block waves-light'><img class='activator' src='"+pics[i].url+"'><span class='card-title'>"+(new Date(pics[i].id)).toLocaleString(navigator.language)+"</span></div><div class='card-reveal'><span class='card-title grey-text text-darken-4'><i class='material-icons right'>close</i></span><p>Long. : "+pics[i].gps.long+"</br>Lat. : "+pics[i].gps.lat+"</p></div></div></div>");
         addMarker(pics[i].gps.lat, pics[i].gps.long, `<img src=\"${pics[i].url}\" />`)
         //pics.push(pics[i]);
     }
