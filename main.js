@@ -24,6 +24,7 @@ let mapMarkers = [];
  */
 let stateStream = true;
 let lastImageRedraw = false;
+window.notify = console.info;
 
 /**
  * Init DB
@@ -259,7 +260,17 @@ function addMarker(lat, lng, content) {
     tmpMarker.addTo(map);
 }
 
-
+function deletePic(id) {
+    db.pics.delete(id)
+    .then(
+        (res) => {
+            notify(`Picture n°${id} deleted`)
+        },
+        (err) => {
+            notify('Fail to remove your picture.')
+        }
+    )
+}
 
 
 
@@ -321,16 +332,16 @@ window.onload = () => {
     }
 
 
-db.pics.each( (pic) => {
-    //addCarousel(pics[i],0);
-    //carouselselector.append("<a class='carousel-item'><img src='"+pics[i].url+"'></a>");
-    //cardselector.append("<div class='col s6 m3 l3'><div class='card'><div class='card-image'><img src='"+pics[i].url+"'><span class='card-title'>"+pics[i].id+"</span></div></div></div>");
-    cardselector.append("<div class='col s6 m3 l3'><div class='card'><div class='card-image waves-effect waves-block waves-light'><img class='activator' src='"+pic.url+"'><span class='card-title'>"+(new Date(pic.id)).toLocaleString(navigator.language)+"</span></div><div class='card-reveal'><span class='card-title grey-text text-darken-4'><i class='material-icons right'>close</i></span><p>Long. : "+pic.gps.long+"</br>Lat. : "+pic.gps.lat+"</p></div></div></div>");
-    addMarker(pic.gps.lat, pic.gps.long, `<img src=\"${pic.url}\" />`)
-    //pics.push(pics[i]);
-      //carouselselector.carousel({indicators:true});
+    db.pics.each( (pic) => {
+        //addCarousel(pics[i],0);
+        //carouselselector.append("<a class='carousel-item'><img src='"+pics[i].url+"'></a>");
+        //cardselector.append("<div class='col s6 m3 l3'><div class='card'><div class='card-image'><img src='"+pics[i].url+"'><span class='card-title'>"+pics[i].id+"</span></div></div></div>");
+        cardselector.append("<div class='col s6 m3 l3'><div class='card'><div class='card-image waves-effect waves-block waves-light'><i onclick='deletePic(" + pic.id + ")' class='material-icons delete-card'>delete</i><img class='activator' src='"+pic.url+"'><span class='card-title'>"+(new Date(pic.id)).toLocaleString(navigator.language)+"</span></div><div class='card-reveal'><span class='card-title grey-text text-darken-4'><i class='material-icons right'>close</i></span><p>Long. : "+pic.gps.long+"</br>Lat. : "+pic.gps.lat+"</p></div></div></div>");
+        addMarker(pic.gps.lat, pic.gps.long, `<img src=\"${pic.url}\" />`)
+        //pics.push(pics[i]);
+        //carouselselector.carousel({indicators:true});
 
-} );
+    } );
 
     // SERVICE WORKER
     /*if('serviceWorker' in navigator) {
@@ -346,25 +357,30 @@ db.pics.each( (pic) => {
         });
     }*/
 
-    // TRACKING V1
-
-    /*let tracker = new tracking.ObjectTracker(['face']);
-    tracker.setInitialScale(1);
-    tracker.setStepSize(2);
-    tracker.setEdgesDensity(0.1);
-    tracking.track('#video', tracker, {camera: true});
-    tracker.on('track', (e) => {
-        //context.clearRect(0, 0, canvas.width, canvas.height);
-        e.data.forEach((rect) => {
-            /*context.strokeStyle = '#a64ceb';
-            context.strokeRect(rect.x, rect.y, rect.width, rect.height);
-            context.font = '11px Helvetica';
-            context.fillStyle = "#fff";
-            context.fillText('x: ' + rect.x + 'px', rect.x + rect.width + 5, rect.y + 11);
-            context.fillText('y: ' + rect.y + 'px', rect.x + rect.width + 5, rect.y + 22);
-            console.log(rect);
+    if (!("Notification" in window)) {
+        alert("Your browser doesn't support notifications");
+    }
+    else if (Notification.permission === "granted") {
+        window.notify = (txt) => {
+            new Notification('HTML5 Photo app', {
+                body: txt,
+                icon: 'images/logo.png'
+            });
+        };
+    }
+    else if (Notification.permission !== 'denied') {
+        Notification.requestPermission(function (permission) {
+            if(!('permission' in Notification)) {
+                Notification.permission = permission;
+            }
+            if (permission === "granted") {
+                window.notify = (txt) => {
+                    new Notification('HTML5 Photo app', {
+                        body: txt,
+                        icon: 'images/logo.png'
+                    });
+                }
+            }
         });
-    });*/
-
-    // TRACKING V2
+    }
 }
