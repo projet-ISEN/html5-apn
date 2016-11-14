@@ -8,7 +8,7 @@ self.addEventListener('install', e => {
         '/css/default.css',
         '/css/materialize.min.css',
         '/fonts',
-        '/images'
+        '/css/images'
       ])
       .then(() => self.skipWaiting());
     })

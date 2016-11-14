@@ -21,6 +21,7 @@ let mapMarkers = [];
 /**
  * Canvas 
  */
+// Default play stream
 let stateStream = true;
 let lastImageRedraw = false;
 
@@ -163,8 +164,7 @@ shootButton.addEventListener("click", (e) => {
     picLat.innerHTML = position.latitude;
     //picAlt.innerHTML = position.altitude;
     picDate.innerHTML = now;
-    //console.log(context.getImageData(0, 0, canvas.width, canvas.height));
-    var temp=  {
+    let temp=  {
         id: now,
         url: canvas.toDataURL(), // context.getImageData(0, 0, canvas.width, canvas.height),
         gps: {
@@ -205,6 +205,47 @@ resetButton.addEventListener('click', (e) => {
  */
 saveButton.addEventListener('click', (e)=> {
     window.open(canvas.toDataURL(), '_TOP');
+});
+
+/**
+ * When you active face tracking
+ */
+tracking.addEventListener('click', (e) => {
+    // Pause stream
+    stateStream = false;
+    window.open('./tracking.html', '_blank', 'fullscreen=yes,menubar=no,statusbar=no,scrollbars=no,width=250,height=300');
+});
+
+/**
+ * When we get response from tracking window
+ */
+window.addEventListener('message', (e) => {
+    console.log(e);
+    if(e.data.img) {
+        console.log("We got an image!");
+    
+        // unPause camera stream
+        stateStream = false;
+
+        // STORE PICS
+        db.pics.put({
+            id: Date.now(),
+            url: e.data.img, // context.getImageData(0, 0, canvas.width, canvas.height),
+            gps: {
+                long: position.longitude,
+                lat: position.latitude,
+                alt: position.altitude
+            }
+        }).then(() => {
+            console.info('Image stored');
+        }).catch((err) =>  {
+            console.error(error);
+        });
+
+        // Update MAP
+        addMarker(position.latitude, position.longitude, `<img src=\"${e.data.img}\" />`);
+        map.flyTo(L.latLng(position.latitude, position.longitude));
+    }
 });
 
 /**

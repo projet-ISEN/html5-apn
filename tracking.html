@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>Camera API</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+		<link rel="icon" href="images/logo.png">
+    <style>
+      body {
+        height: 300px !important;
+      }
+      #canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+      }
+      #camera {
+        display: none;
+        position: absolute;
+        top: 0;
+        left: 0;
+      }
+      p {
+        position: absolute;
+        top: 250px;
+      }
+    </style>
+
+	</head>
+	<body> 
+    <video id="camera" autoplay="true" width="250" height="250"></video>
+    <canvas id="canvas" width="250" height="250"></canvas>
+    <p>Click to take a photo</p>
+
+    <script src="./tracking.js"></script>
+    <script src="./face-min.js"></script>
+    <script>    
+
+window.onload = () => {
+
+  video = document.getElementById('camera');
+  canvas = document.getElementById('canvas');
+  context = canvas.getContext('2d');
+  target = {};
+
+  canvas.addEventListener('click', (e) => {
+    
+  });
+
+  navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia || navigator.oGetUserMedia;
+  if (navigator.getUserMedia) {       
+      navigator.getUserMedia({video: true}, handleVideo, videoError);
+  }
+};
+
+window.addEventListener('click', (e) => {
+  // last image without target
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    window.opener.postMessage({
+      img: canvas.toDataURL()
+    }, '*');
+    window.close();
+});
+
+function drawTarget(rect) {
+    //context.clearRect(0, 0, canvas.width, canvas.height);
+    let unitWidth = rect.width / 8;
+    let unitHeight = rect.height / 8;
+
+    context.lineCap     = 'round';
+    context.lineWidth   = 2;
+    // Circle
+    context.beginPath();
+    context.arc(rect.x + rect.width /2 , rect.y + rect.height /2, unitWidth, 0, 2*Math.PI);
+    context.stroke();
+    // Vertical axes
+    context.moveTo(rect.x  + 4* unitWidth, rect.y);
+    context.lineTo(rect.x  + 4* unitWidth, rect.y + 8* unitHeight);
+    context.stroke();
+    /*context.moveTo(5 * unitWidth + rect.x, 4*rect.height + rect.y);
+    context.lineTo(6 * unitWidth + rect.x, 4*rect.height + rect.y);
+    context.stroke();*/
+    // Horizontal axes
+    context.moveTo(rect.x, rect.y + 4* unitHeight);
+    context.lineTo(rect.x + 8* unitWidth, rect.y + 4* unitHeight);
+    context.stroke();
+    /*context.moveTo(4 * unitWidth + rect.x, 5*rect.height + rect.y);
+    context.lineTo(4 * unitWidth + rect.x, 6*rect.height + rect.y);
+    context.stroke();*/
+}
+      
+function handleVideo(stream) {
+    video.src = window.URL.createObjectURL(stream);
+
+    let tracker = new tracking.ObjectTracker(['face']);
+    tracker.setInitialScale(1);
+    tracker.setStepSize(2);
+    tracker.setEdgesDensity(0.1);
+    tracking.track('#camera', tracker, {camera: true});
+    tracker.on('track', (e) => {
+        e.data.forEach((rect) => {
+            target = rect
+        });
+    });
+    refresh();
+}
+
+function videoError() {
+}
+
+function refresh() {
+  context.drawImage(video, 0, 0, canvas.width, canvas.height);
+  window.requestAnimationFrame(refresh);
+  drawTarget(target);
+}
+      
+    </script>
+  </body>
+</html>

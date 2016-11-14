@@ -2,29 +2,29 @@
   "name": "Camera Html5",
   "short_name": "Isen shot",
   "icons": [{
-        "src": "images/logo.png",
+        "src": "css/images/logo.png",
         "type": "image/png",
         "sizes": "128x128"
       }, {
-        "src": "images/logo.png",
+        "src": "css/images/logo.png",
         "type": "image/png",
         "sizes": "152x152"
       }, {
-        "src": "images/logo.png",
+        "src": "css/images/logo.png",
         "type": "image/png",
         "sizes": "144x144"
       }, {
-        "src": "images/logo.png",
+        "src": "css/images/logo.png",
         "type": "image/png",
         "sizes": "192x192"
       },
       {
-        "src": "images/logo.png",
+        "src": "css/images/logo.png",
         "type": "image/png",
         "sizes": "256x256"
       },
       {
-        "src": "images/logo.png",
+        "src": "css/images/logo.png",
         "type": "image/png",
         "sizes": "512x512"
       }],
