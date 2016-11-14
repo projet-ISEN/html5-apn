@@ -20,22 +20,24 @@
 		</nav>
 		<div class="container main">
 			<div class="row">
-				<div class="col s12">
-					<video id="video" width="1500" height="1500" autoplay></video>
-					<canvas id="target" width="500" height="500"></canvas>
-					<canvas id="canvas" width="1500" height="1500"></canvas>
+				<div id="canvasRow" class="col s12">
+					<canvas id="canvas" width="500" height="500"></canvas>
+					<video id="video" width="500" height="500" preload autoplay loop muted></video>
 				</div>
 			</div>
-            <div class="row">
-                <div class="col s8 offset-s2 center-align">
-				<a  id="save" class="waves-effect waves-light btn-large"><i class="material-icons right">send</i>Save</a>
-				<a  id="shoot" class="waves-effect waves-light btn-large"><i class="material-icons right">camera_enhance</i>Shoot</a>
-				<a  id="reset" class="waves-effect waves-light btn-large"><i class="material-icons right">clear_all</i>Reset</a>
-                </div>
+			<div class="row">
+				<div class="col s8 offset-s2 center-align">
+					<a id="save" class="waves-effect waves-light btn-large">
+						<i class="material-icons right">send</i>Save
+					</a>
+					<a id="shoot" class="waves-effect waves-light btn-large">
+						<i class="material-icons right">camera_enhance</i>Shoot
+					</a>
+					<a id="reset" class="waves-effect waves-light btn-large">
+						<i class="material-icons right">clear_all</i>Reset
+					</a>
+				</div>
 			</div>
-<!--			<div class="col s12">
-				<canvas id="canvas" width="1500" height="1500"></canvas>
-			</div>-->
 		</div>
         <div class="container">
             <div class="cardZone row">
@@ -43,9 +45,6 @@
             </div>
         
         </div>
-<!--            <div class="carousel row">
-  </div>-->
-        
 <!--            <div class="carousel carousel-slider">
 
           </div>-->
@@ -58,50 +57,49 @@
 				<p>Date : <span id="picDate"></span></p>
 			</div>
 		</div>-->
-			<div class="row">
-             <table class="centered col s8 offset-s2">
+	<div class="row">
+  	<table class="centered col s8 offset-s2">
 <!--        <thead>
           <tr>
               <th data-field="id">Name</th>
               <th data-field="name">Item Name</th>
           </tr>
         </thead>-->
+    	<tbody >
+      	<tr>
+					<td>Long</td>
+					<td id="picLong"></td>
+				</tr>
+				<tr>
+					<td>Lat</td>
+					<td id="picLat"></td>
+				</tr>
+				<tr>
+					<td>Date</td>
+					<td id="picDate"></td>
+				</tr>
+      </tbody>
+    </table>
+  </div>
+	<div class="row">
+		<div id="map"></div>
+	</div>
 
-        <tbody >
-          <tr>
-            <td>Long</td>
-            <td id="picLong"></td>
-          </tr>
-          <tr>
-            <td>Lat</td>
-            <td id="picLat"></td>
-          </tr>
-<!--          <tr>
-            <td>Alt</td>
-            <td id="picAlt"></td>
-          </tr>
-          <tr>-->
-            <td>Date</td>
-            <td id="picDate"></td>
-          </tr>
-        </tbody>
-      </table>
-        </div>
-			<div class="row">
+	<footer class="row valign-wrapper">
+			<p>Collignon Rémi et Riouallon Vincent</p>
+	</footer>
 
-				<div id="map"></div>
-			</div>
+	<!-- LIBS IMPORT -->
+	<script rel="application/javascript" src="./dexie.js" ></script>
+	<script src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+	<script src="./leaflet.js"></script>
+	<script src="./materialize.js"></script>
+	<script src="./tracking.js"></script>
+	<script src="./face-min.js"></script>
+	<script src="./eye-min.js"></script>
 
-        <footer class="row valign-wrapper">
-            <div class="center-align valign">Collignon Rémi et Riouallon Vincent</div>
-
-        </footer>
-
-			<script rel="application/javascript" src="./dexie.js" ></script>
-			<script src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
-			<script src="./leaflet.js"></script>
-			<script src="./materialize.js"></script>
-
-		<script src="./main.js"></script>
+	<!-- PROJECT IMPORTS -->
+	<script src="./main.js"></script>
 	</body>
 </html>
+>>>>>>> 738f72df305a4000af6e7e69b4c5ad822404feef
