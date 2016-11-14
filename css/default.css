@@ -45,6 +45,13 @@ video {
     color: white;
     z-index: 10000;
 }
+.download-card {
+    position: absolute;
+    right: 2rem;
+    top: 0.2rem;
+    color: white;
+    z-index: 10000;
+}
 
 
 /*nav*/

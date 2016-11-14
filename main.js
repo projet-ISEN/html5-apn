@@ -70,6 +70,11 @@ function drawTarget() {
 }
 
 
+
+function addCard(pic){
+    cardselector.append("<div class='col s6 m3 l3' id='"+pic.id+"'><div class='card'><div class='card-image waves-effect waves-block waves-light'><i class='material-icons delete-card' onclick='deletePic("+pic.id+")'>delete</i><i class='material-icons download-card' onclick=\"downloadCard('"+pic.url+"')\">play_for_work</i><img class='activator' src='"+pic.url+"'><span class='card-title'>"+(new Date(pic.id)).toLocaleString(navigator.language)+"</span></div><div class='card-reveal'><span class='card-title grey-text text-darken-4'><i class='material-icons right'>close</i></span><p>Long. : "+pic.gps.long+"</br>Lat. : "+pic.gps.lat+"</p></div></div></div>");
+}
+
 /**
  * Request and start Camera
  */
@@ -121,7 +126,7 @@ shootButton.addEventListener("click", (e) => {
     picLong.value = position.longitude;
     picLat.value = position.latitude;
     //picAlt.innerHTML = position.altitude;
-    picDate.innerHTML = now;
+    picDate.value = (new Date(now)).toLocaleString(navigator.language);
     //console.log(context.getImageData(0, 0, canvas.width, canvas.height));
     var temp=  {
         id: now,
@@ -134,12 +139,12 @@ shootButton.addEventListener("click", (e) => {
     };
     // STORE PICS
     db.pics.put(temp).then(() => {
-        console.info('Image stored');
+        notify('Cheese !')
     }).catch((err) =>  {
-        console.error(error);
+        notify(error);
     });
 
-
+    addCard(temp);
     // Update MAP
     addMarker(position.latitude, position.longitude, `<img src=\"${canvas.toDataURL()}\" />`);
     map.flyTo(L.latLng(position.latitude, position.longitude));
@@ -151,17 +156,18 @@ shootButton.addEventListener("click", (e) => {
 resetButton.addEventListener('click', (e) => {
     stateStream = true;
     lastImageRedraw = false;
-    picLong.innerHTML = "";
-    picLat.innerHTML = "";
-    picAlt.innerHTML = "";
-    picDate.innerHTML = "";
+    picLong.value = "";
+    picLat.value = "";
+    picAlt.value = "";
+    picDate.value = "";
 });
 
 /**
  * When you want to save a photo
  */
 saveButton.addEventListener('click', (e)=> {
-    window.open(canvas.toDataURL(), '_TOP');
+    //window.open(canvas.toDataURL(), '_TOP');
+    downloadFile(canvas.toDataURL());
 });
 
 /**
@@ -170,7 +176,8 @@ saveButton.addEventListener('click', (e)=> {
 tracking.addEventListener('click', (e) => {
     // Pause stream
     stateStream = false;
-    window.open('./tracking.html', '_blank', 'fullscreen=yes,menubar=no,statusbar=no,scrollbars=no,width=250,height=300');
+    window.open('./tracking.html', '_blank', 'fullscreen=yes,menubar=no,statusbar=no,scrollbars=no,width=250,height=250');
+    notify('Click on new popup to take a photo');
 });
 
 /**
@@ -185,7 +192,7 @@ window.addEventListener('message', (e) => {
         stateStream = false;
 
         // STORE PICS
-        db.pics.put({
+        let tmp = {
             id: Date.now(),
             url: e.data.img, // context.getImageData(0, 0, canvas.width, canvas.height),
             gps: {
@@ -193,11 +200,13 @@ window.addEventListener('message', (e) => {
                 lat: position.latitude,
                 alt: position.altitude
             }
-        }).then(() => {
+        };
+        db.pics.put(tmp).then(() => {
             console.info('Image stored');
         }).catch((err) =>  {
             console.error(error);
         });
+        addCard(tmp);
 
         // Update MAP
         addMarker(position.latitude, position.longitude, `<img src=\"${e.data.img}\" />`);
@@ -260,6 +269,11 @@ function addMarker(lat, lng, content) {
     tmpMarker.addTo(map);
 }
 
+/**
+ * Delete an image in DB and in dom
+ * 
+ * @param TS id
+ */
 function deletePic(id) {
     db.pics.delete(id)
     .then(
@@ -273,7 +287,50 @@ function deletePic(id) {
     )
 }
 
+/**
+ * Call from dom, download url
+ * 
+ * @param {any} url
+ */
+function downloadCard(url) {
+    downloadFile(url);
+}
 
+/**
+ * Force browser to download url
+ * 
+ * @param {any} sUrl
+ * @returns
+ */
+function downloadFile(sUrl) {
+    isChrome = navigator.userAgent.toLowerCase().indexOf('chrome') > -1;
+    isSafari = navigator.userAgent.toLowerCase().indexOf('safari') > -1;
+    if (/(iP)/g.test(navigator.userAgent)) {
+       window.open(sUrl, '_blank');
+       return false;
+    }
+    if (isChrome || isSafari) {
+        let link = document.createElement('a');
+        link.href = sUrl;
+        link.setAttribute('target','_blank');
+
+        if (link.download !== undefined) {
+            var fileName = sUrl.substring(sUrl.lastIndexOf('/') + 1, sUrl.length);
+            link.download = fileName;
+        }
+        if (document.createEvent) {
+            var e = document.createEvent('MouseEvents');
+            e.initEvent('click', true, true);
+            link.dispatchEvent(e);
+            return true;
+        }
+    }
+    if (sUrl.indexOf('?') === -1) {
+        sUrl += '?download';
+    }
+    window.open(sUrl, '_blank');
+    return true;
+}
 
 
 
@@ -302,14 +359,6 @@ window.onload = () => {
     // Start to watch GPS position
     if (navigator.geolocation) {
         navigator.geolocation.watchPosition( (pos) => {
-            // pos.latitude	The latitude as a decimal number (always returned)
-            // pos.longitude	The longitude as a decimal number (always returned)
-            // pos.accuracy	The accuracy of position (always returned)
-            // pos.altitude	The altitude in meters above the mean sea level (returned if available)
-            // pos.altitudeAccuracy	The altitude accuracy of position (returned if available)
-            // pos.heading	The heading as degrees clockwise from North (returned if available)
-            // pos.speed The speed in meters per second (returned if available)
-            //console.log(pos);
             position = pos.coords;
         }, (err) => {
             switch(err.code) {
@@ -332,16 +381,9 @@ window.onload = () => {
         console.error("Your browser doesn't support this feature");
     }
 
-
     db.pics.each( (pic) => {
-        //addCarousel(pics[i],0);
-        //carouselselector.append("<a class='carousel-item'><img src='"+pics[i].url+"'></a>");
-        //cardselector.append("<div class='col s6 m3 l3'><div class='card'><div class='card-image'><img src='"+pics[i].url+"'><span class='card-title'>"+pics[i].id+"</span></div></div></div>");
-        cardselector.append("<div class='col s6 m3 l3' id='"+ pic.id +"'><div class='card'><div class='card-image waves-effect waves-block waves-light'><i onclick='deletePic(" + pic.id + ")' class='material-icons delete-card'>delete</i><img class='activator' src='"+pic.url+"'><span class='card-title'>"+(new Date(pic.id)).toLocaleString(navigator.language)+"</span></div><div class='card-reveal'><span class='card-title grey-text text-darken-4'><i class='material-icons right'>close</i></span><p>Long. : "+pic.gps.long+"</br>Lat. : "+pic.gps.lat+"</p></div></div></div>");
+        addCard(pic);
         addMarker(pic.gps.lat, pic.gps.long, `<img src=\"${pic.url}\" />`)
-        //pics.push(pics[i]);
-        //carouselselector.carousel({indicators:true});
-
     } );
 
     // SERVICE WORKER
