@@ -320,19 +320,14 @@ window.onload = () => {
         console.error("Your browser doesn't support this feature");
     }
 
-    /**
-     * Load card and Map with pictures
-     */
-db.pics.toArray( (pics) => {
-    console.log(pics);
-    for(i=0;i<pics.length;i++){
-       //addCarousel(pics[i],0);
-        //carouselselector.append("<a class='carousel-item'><img src='"+pics[i].url+"'></a>");
-        //cardselector.append("<div class='col s6 m3 l3'><div class='card'><div class='card-image'><img src='"+pics[i].url+"'><span class='card-title'>"+pics[i].id+"</span></div></div></div>");
-        cardselector.append("<div class='col s6 m3 l3'><div class='card'><div class='card-image waves-effect waves-block waves-light'><img class='activator' src='"+pics[i].url+"'><span class='card-title'>"+(new Date(pics[i].id)).toLocaleString(navigator.language)+"</span></div><div class='card-reveal'><span class='card-title grey-text text-darken-4'><i class='material-icons right'>close</i></span><p>Long. : "+pics[i].gps.long+"</br>Lat. : "+pics[i].gps.lat+"</p></div></div></div>");
-        addMarker(pics[i].gps.lat, pics[i].gps.long, `<img src=\"${pics[i].url}\" />`)
-        //pics.push(pics[i]);
-    }
+
+db.pics.each( (pic) => {
+    //addCarousel(pics[i],0);
+    //carouselselector.append("<a class='carousel-item'><img src='"+pics[i].url+"'></a>");
+    //cardselector.append("<div class='col s6 m3 l3'><div class='card'><div class='card-image'><img src='"+pics[i].url+"'><span class='card-title'>"+pics[i].id+"</span></div></div></div>");
+    cardselector.append("<div class='col s6 m3 l3'><div class='card'><div class='card-image waves-effect waves-block waves-light'><img class='activator' src='"+pic.url+"'><span class='card-title'>"+(new Date(pic.id)).toLocaleString(navigator.language)+"</span></div><div class='card-reveal'><span class='card-title grey-text text-darken-4'><i class='material-icons right'>close</i></span><p>Long. : "+pic.gps.long+"</br>Lat. : "+pic.gps.lat+"</p></div></div></div>");
+    addMarker(pic.gps.lat, pic.gps.long, `<img src=\"${pics[i].url}\" />`)
+    //pics.push(pics[i]);
       //carouselselector.carousel({indicators:true});
 
 } );
