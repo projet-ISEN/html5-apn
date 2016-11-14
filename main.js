@@ -166,7 +166,6 @@ resetButton.addEventListener('click', (e) => {
  * When you want to save a photo
  */
 saveButton.addEventListener('click', (e)=> {
-    //window.open(canvas.toDataURL(), '_TOP');
     downloadFile(canvas.toDataURL());
 });
 
@@ -176,7 +175,7 @@ saveButton.addEventListener('click', (e)=> {
 tracking.addEventListener('click', (e) => {
     // Pause stream
     stateStream = false;
-    window.open('./tracking.html', '_blank', 'fullscreen=yes,menubar=no,statusbar=no,scrollbars=no,width=250,height=250');
+    window.open('./tracking.html', '_blank', "menubar=0,titlebar=0,scrollbars=0,width=250,height=250,toolbar=0");
     notify('Click on new popup to take a photo');
 });
 
@@ -184,12 +183,10 @@ tracking.addEventListener('click', (e) => {
  * When we get response from tracking window
  */
 window.addEventListener('message', (e) => {
-    console.log(e);
+    // unPause camera stream
+    stateStream = true;
     if(e.data.img) {
         console.log("We got an image!");
-    
-        // unPause camera stream
-        stateStream = false;
 
         // STORE PICS
         let tmp = {
