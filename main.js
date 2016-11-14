@@ -12,7 +12,7 @@ let context = canvas.getContext('2d');
 let target = document.getElementById("target");
 let targetContext = target.getContext('2d');
 let dateField = document.getElementById("infos");
-let carouselselector = $(".carousel");
+let cardselector = $(".cardZone");
 /**
  * GPS position
  */
@@ -45,12 +45,22 @@ db.open().catch((e) => {
 db.pics.toArray( (pics) => {
     console.log(pics);
     for(i=0;i<pics.length;i++){
-       addCarousel(pics[i],0);
+       //addCarousel(pics[i],0);
         //carouselselector.append("<a class='carousel-item'><img src='"+pics[i].url+"'></a>");
+        cardselector.append("<div class='col s6 m3 l3'><div class='card'>
+            <div class='card-image'>
+              <img src='"+pics[i].url+"'>
+              <span class='card-title'>Card Title</span>
+            </div>
+            <div class='card-content'>
+              <p>I am a very simple card. I am good at containing small bits of information.
+              I am convenient because I require little markup to use effectively.</p>
+            </div>
+          </div></div>");
         addMarker(pics[i].gps.lat, pics[i].gps.long, `<img src=\"${pics[i].url}\" />`)
         //pics.push(pics[i]);
     }
-      carouselselector.carousel({indicators:true});
+      //carouselselector.carousel({indicators:true});
 
 } );
 
@@ -91,7 +101,7 @@ navigator.getUserMedia({
 });
 
 
-function refreshCarousel(){
+/*function refreshCarousel(){
     $(".carousel").empty();
     carouselselector.removeClass('initialized');
 
@@ -107,14 +117,14 @@ function refreshCarousel(){
             carouselselector.carousel('prev');
 
     });
-}
+}*/
 
 /**
  *
  * @param {any} pic
  * @param {any} left
  */
-function addCarousel(pic,left){
+/*function addCarousel(pic,left){
     carouselselector.append("<a class='carousel-item'><img src='"+pic.url+"' long='"+pic.gps.long+"' lat='"+pic.gps.lat+"' alt='"+pic.gps.alt+"' date='"+pic.id+"' >");
     if(left){
     refreshCarousel();
@@ -126,7 +136,7 @@ document.getElementsByClassName("carousel")[0].addEventListener("click", (e) => 
     let target = $('.indicator-item.active').index();
     console.log(target );
     //console.log(target.children("img").attr("date"));
-});
+});*/
 
 
 /**
@@ -159,7 +169,7 @@ shootButton.addEventListener("click", (e) => {
         console.error(error);
     });
     
-        refreshCarousel(temp,1);
+        //refreshCarousel(temp,1);
 
     // Update MAP
     addMarker(position.latitude, position.longitude, `<img src=\"${canvas.toDataURL()}\" />`);
