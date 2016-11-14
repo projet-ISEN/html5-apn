@@ -117,8 +117,8 @@ shootButton.addEventListener("click", (e) => {
     stateStream = false;
     let now = Date.now();
     context.drawImage(video, 0, 0, video.width, video.height);
-    picLong.innerHTML = position.longitude;
-    picLat.innerHTML = position.latitude;
+    picLong.value = position.longitude;
+    picLat.value = position.latitude;
     //picAlt.innerHTML = position.altitude;
     picDate.innerHTML = now;
     //console.log(context.getImageData(0, 0, canvas.width, canvas.height));

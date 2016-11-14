@@ -42,32 +42,15 @@
 				</div>
 			</div>
 		</div>
-        <div class="container">
-            <div class="cardZone row">
-            
-            </div>
         
-        </div>
-<!--            <div class="carousel carousel-slider">
-
-          </div>-->
-<!--		<div class="row">
-			<div class="col s12">
-				<h2>Informations :</h2>
-				<p>Long : <span id="picLong"></span></p>
-				<p>Lat : <span id="picLat"></span></p>
-				<p>Alt : <span id="picAlt"></span></p>
-				<p>Date : <span id="picDate"></span></p>
-			</div>
-		</div>-->
-	<div class="row">
-  	<table class="centered col s8 offset-s2">
-<!--        <thead>
+        	<div class="row">
+  	<!--<table class="centered col s8 offset-s2">
+        <thead>
           <tr>
               <th data-field="id">Name</th>
               <th data-field="name">Item Name</th>
           </tr>
-        </thead>-->
+        </thead>
     	<tbody >
       	<tr>
 					<td>Long</td>
@@ -82,8 +65,39 @@
 					<td id="picDate"></td>
 				</tr>
       </tbody>
-    </table>
+    </table>-->
+
+
+        <div class="input-field col s3 offset-s6">
+          <input readonly value=" " id="picLong" type="text" class="validate">
+          <label>Latitude</label>
+        </div>
+
+        <div class="input-field col s3 offset-s6">
+          <input readonly value=" " id="picLat" type="text" class="validate">
+          <label>Longitude</label>
+        </div>
   </div>
+
+        <div class="container">
+            <div class="cardZone row">
+
+            </div>
+
+        </div>
+<!--            <div class="carousel carousel-slider">
+
+          </div>-->
+<!--		<div class="row">
+			<div class="col s12">
+				<h2>Informations :</h2>
+				<p>Long : <span id="picLong"></span></p>
+				<p>Lat : <span id="picLat"></span></p>
+				<p>Alt : <span id="picAlt"></span></p>
+				<p>Date : <span id="picDate"></span></p>
+			</div>
+		</div>-->
+
 	<div class="row">
 		<div id="map"></div>
 	</div>
