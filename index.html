@@ -6,11 +6,11 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 		<link rel="icon" href="images/logo.png">
 		<link rel="manifest" href="manifest.json">
-		<!-- Compiled and minified CSS -->
+
 		<link rel="stylesheet" href="./css/materialize.min.css">
 		<link rel="stylesheet" href="./css/default.css">
 		<link rel="stylesheet" href="./leaflet.css">
-		<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+		<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
 	</head>
 	<body>
 		<nav class="row">
@@ -42,85 +42,40 @@
 				</div>
 			</div>
 		</div>
-        
-        	<div class="row">
-  	<!--<table class="centered col s8 offset-s2">
-        <thead>
-          <tr>
-              <th data-field="id">Name</th>
-              <th data-field="name">Item Name</th>
-          </tr>
-        </thead>
-    	<tbody >
-      	<tr>
-					<td>Long</td>
-					<td id="picLong"></td>
-				</tr>
-				<tr>
-					<td>Lat</td>
-					<td id="picLat"></td>
-				</tr>
-				<tr>
-					<td>Date</td>
-					<td id="picDate"></td>
-				</tr>
-      </tbody>
-    </table>-->
-
-
-        <div class="input-field col s4 offset-s4">
-          <input readonly value=" " id="picLong" type="text" class="validate">
-          <label>Latitude</label>
-        </div>
-
-        <div class="input-field col s4 offset-s4">
-          <input readonly value=" " id="picLat" type="text" class="validate">
-          <label>Longitude</label>
-        </div>
-
-        <div class="input-field col s4 offset-s4">
-          <input readonly value=" " id="picDate" type="text" class="validate">
-          <label>Date</label>
-        </div>
-  </div>
-
-        <div class="container">
-            <div class="cardZone row">
-
-            </div>
-
-        </div>
-<!--            <div class="carousel carousel-slider">
-
-          </div>-->
-<!--		<div class="row">
-			<div class="col s12">
-				<h2>Informations :</h2>
-				<p>Long : <span id="picLong"></span></p>
-				<p>Lat : <span id="picLat"></span></p>
-				<p>Alt : <span id="picAlt"></span></p>
-				<p>Date : <span id="picDate"></span></p>
+    <div class="row">
+			<div class="input-field col s4 offset-s4">
+				<input readonly value=" " id="picLong" type="text" class="validate">
+				<label>Latitude</label>
 			</div>
-		</div>-->
-
+			<div class="input-field col s4 offset-s4">
+				<input readonly value=" " id="picLat" type="text" class="validate">
+				<label>Longitude</label>
+			</div>
+			<div class="input-field col s4 offset-s4">
+				<input readonly value=" " id="picDate" type="text" class="validate">
+				<label>Date</label>
+			</div>
+  </div>
+	<div class="container">
+			<div class="cardZone row"></div>
+	</div>
 	<div class="row">
 		<div id="map"></div>
 	</div>
-
 	<footer class="row valign-wrapper">
 			<p>Collignon Rémi et Riouallon Vincent</p>
 	</footer>
 
 	<!-- LIBS IMPORT -->
 	<script rel="application/javascript" src="./dexie.js" ></script>
-	<script src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
-	<script src="./leaflet.js"></script>
-	<script src="./materialize.js"></script>
-	<script src="./tracking.js"></script>
-	<script src="./face-min.js"></script>
-	<script src="./eye-min.js"></script>
+	<script rel="application/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+	<script rel="application/javascript" src="./leaflet.js"></script>
+	<script rel="application/javascript" src="./materialize.js"></script>
+	<script rel="application/javascript" src="./tracking.js"></script>
+	<script rel="application/javascript" src="./face-min.js"></script>
+	<script rel="application/javascript" src="./eye-min.js"></script>
 
 	<!-- PROJECT IMPORTS -->
-	<script src="./main.js"></script>
+	<script rel="application/javascript" src="./main.js"></script>
 	</body>
 </html>

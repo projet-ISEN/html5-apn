@@ -69,8 +69,11 @@ function drawTarget() {
     context.stroke();
 }
 
-
-
+/**
+ * Add a card in DOM
+ * 
+ * @param Object pic
+ */
 function addCard(pic){
     cardselector.append("<div class='col s6 m3 l3' id='"+pic.id+"'><div class='card'><div class='card-image waves-effect waves-block waves-light'><i class='material-icons devare-card' onclick='devarePic("+pic.id+")'>devare</i><i class='material-icons download-card' onclick=\"downloadCard('"+pic.url+"')\">play_for_work</i><img class='activator' src='"+pic.url+"'><span class='card-title'>"+(new Date(pic.id)).toLocaleString(navigator.language)+"</span></div><div class='card-reveal'><span class='card-title grey-text text-darken-4'><i class='material-icons right'>close</i></span><p>Long. : "+pic.gps.long+"</br>Lat. : "+pic.gps.lat+"</p></div></div></div>");
 }
@@ -119,18 +122,15 @@ function drawCamera() {
  * When a photo taken
  */
 shootButton.addEventListener("click", (e) => {
-    // Display
     stateStream = false;
     var now = Date.now();
     context.drawImage(video, 0, 0, video.width, video.height);
     picLong.value = position.longitude;
     picLat.value = position.latitude;
-    //picAlt.innerHTML = position.altitude;
     picDate.value = (new Date(now)).toLocaleString(navigator.language);
-    //console.log(context.getImageData(0, 0, canvas.width, canvas.height));
     var temp=  {
         id: now,
-        url: canvas.toDataURL(), // context.getImageData(0, 0, canvas.width, canvas.height),
+        url: canvas.toDataURL(),
         gps: {
             long: position.longitude,
             lat: position.latitude,
@@ -191,7 +191,7 @@ window.addEventListener('message', (e) => {
         // STORE PICS
         var tmp = {
             id: Date.now(),
-            url: e.data.img, // context.getImageData(0, 0, canvas.width, canvas.height),
+            url: e.data.img,
             gps: {
                 long: position.longitude,
                 lat: position.latitude,
@@ -210,10 +210,6 @@ window.addEventListener('message', (e) => {
         map.flyTo(L.latLng(position.latitude, position.longitude));
     }
 });
-
-/**
- * Build a list based on items
- */
 
 /**
  *
@@ -329,15 +325,6 @@ function downloadFile(sUrl) {
     return true;
 }
 
-
-
-
-
-
-
-
-
-
 /**
  * Initialisation
  */
@@ -384,7 +371,7 @@ window.onload = () => {
     } );
 
     // SERVICE WORKER
-    /*if('serviceWorker' in navigator) {
+    if('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/sw.js', {
             scope: '/',
             insecure: true
@@ -395,8 +382,9 @@ window.onload = () => {
         navigator.serviceWorker.ready.then((registration) => {
             console.info('Service Worker Ready');
         });
-    }*/
+    }
 
+    // Notification request
     if (!("Notification" in window)) {
         alert("Your browser doesn't support notifications");
     }
