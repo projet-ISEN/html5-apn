@@ -1,37 +1,37 @@
 // Grab elements, create settings, etc.
-let canvas = document.getElementById('canvas');
-let video = document.getElementById('video');
-let shootButton = document.getElementById("shoot");
-let resetButton = document.getElementById("reset");
-let saveButton = document.getElementById("save");
-let tracking = document.getElementById('tracking');
-let picLong = document.getElementById("picLong");
-let picLat = document.getElementById("picLat");
-let picAlt = document.getElementById("picAlt");
-let picDate = document.getElementById("picDate");
-let context = canvas.getContext('2d');
-let dateField = document.getElementById("infos");
-let cardselector = $(".cardZone");
+var canvas = document.getElementById('canvas');
+var video = document.getElementById('video');
+var shootButton = document.getElementById("shoot");
+var resetButton = document.getElementById("reset");
+var saveButton = document.getElementById("save");
+var tracking = document.getElementById('tracking');
+var picLong = document.getElementById("picLong");
+var picLat = document.getElementById("picLat");
+var picAlt = document.getElementById("picAlt");
+var picDate = document.getElementById("picDate");
+var context = canvas.getContext('2d');
+var dateField = document.getElementById("infos");
+var cardselector = $(".cardZone");
 /**
  * GPS position
  */
-let position = {};
-let map = {};
-let mapMarkers = [];
+var position = {};
+var map = {};
+var mapMarkers = [];
 
 /**
  * Canvas
  */
-let stateStream = true;
-let lastImageRedraw = false;
+var stateStream = true;
+var lastImageRedraw = false;
 window.notify = console.info;
 
 /**
  * Init DB
  */
-let db = new Dexie("cameraApp");
-let dbOK = true;
-let pics = [];
+var db = new Dexie("cameraApp");
+var dbOK = true;
+var pics = [];
 db.version(1).stores({
     pics: 'id, url, gps'
 });
@@ -45,8 +45,8 @@ db.open().catch((e) => {
  * Draw a target on canvas
  */
 function drawTarget() {
-    let unitWidth       = canvas.width / 8;
-    let unitHeight      = canvas.height / 8;
+    var unitWidth       = canvas.width / 8;
+    var unitHeight      = canvas.height / 8;
     context.lineCap     = 'round';
     context.lineWidth   = 3;
     // Circle
@@ -72,7 +72,7 @@ function drawTarget() {
 
 
 function addCard(pic){
-    cardselector.append("<div class='col s6 m3 l3' id='"+pic.id+"'><div class='card'><div class='card-image waves-effect waves-block waves-light'><i class='material-icons delete-card' onclick='deletePic("+pic.id+")'>delete</i><i class='material-icons download-card' onclick=\"downloadCard('"+pic.url+"')\">play_for_work</i><img class='activator' src='"+pic.url+"'><span class='card-title'>"+(new Date(pic.id)).toLocaleString(navigator.language)+"</span></div><div class='card-reveal'><span class='card-title grey-text text-darken-4'><i class='material-icons right'>close</i></span><p>Long. : "+pic.gps.long+"</br>Lat. : "+pic.gps.lat+"</p></div></div></div>");
+    cardselector.append("<div class='col s6 m3 l3' id='"+pic.id+"'><div class='card'><div class='card-image waves-effect waves-block waves-light'><i class='material-icons devare-card' onclick='devarePic("+pic.id+")'>devare</i><i class='material-icons download-card' onclick=\"downloadCard('"+pic.url+"')\">play_for_work</i><img class='activator' src='"+pic.url+"'><span class='card-title'>"+(new Date(pic.id)).toLocaleString(navigator.language)+"</span></div><div class='card-reveal'><span class='card-title grey-text text-darken-4'><i class='material-icons right'>close</i></span><p>Long. : "+pic.gps.long+"</br>Lat. : "+pic.gps.lat+"</p></div></div></div>");
 }
 
 /**
@@ -121,7 +121,7 @@ function drawCamera() {
 shootButton.addEventListener("click", (e) => {
     // Display
     stateStream = false;
-    let now = Date.now();
+    var now = Date.now();
     context.drawImage(video, 0, 0, video.width, video.height);
     picLong.value = position.longitude;
     picLat.value = position.latitude;
@@ -189,7 +189,7 @@ window.addEventListener('message', (e) => {
         console.log("We got an image!");
 
         // STORE PICS
-        let tmp = {
+        var tmp = {
             id: Date.now(),
             url: e.data.img, // context.getImageData(0, 0, canvas.width, canvas.height),
             gps: {
@@ -221,7 +221,7 @@ window.addEventListener('message', (e) => {
  * @returns
  */
 function buildList(data) {
-    let i, item, ref = {}, counts = {};
+    var i, item, ref = {}, counts = {};
     function ul() {
         return document.createElement('ul');
     }
@@ -256,7 +256,7 @@ function buildList(data) {
  * @param string content
  */
 function addMarker(lat, lng, content) {
-    let tmpMarker = L.marker([lat, lng])
+    var tmpMarker = L.marker([lat, lng])
     .bindPopup( new L.popup({
         minWidth: screen.width / 10,
         closeButton: false
@@ -267,15 +267,15 @@ function addMarker(lat, lng, content) {
 }
 
 /**
- * Delete an image in DB and in dom
+ * Devare an image in DB and in dom
  * 
  * @param TS id
  */
-function deletePic(id) {
-    db.pics.delete(id)
+function devarePic(id) {
+    db.pics.devare(id)
     .then(
         (res) => {
-            notify(`Picture n°${id} deleted`)
+            notify(`Picture n°${id} devared`)
             document.getElementById(id).remove();
         },
         (err) => {
@@ -307,7 +307,7 @@ function downloadFile(sUrl) {
        return false;
     }
     if (isChrome || isSafari) {
-        let link = document.createElement('a');
+        var link = document.createElement('a');
         link.href = sUrl;
         link.setAttribute('target','_blank');
 
@@ -402,7 +402,7 @@ window.onload = () => {
     }
     else if (Notification.permission === "granted") {
         window.notify = (txt) => {
-            let n = new Notification('HTML5 Photo app', {
+            var n = new Notification('HTML5 Photo app', {
                 body: txt,
                 icon: 'images/logo.png'
             });
@@ -418,7 +418,7 @@ window.onload = () => {
             }
             if (permission === "granted") {
                 window.notify = (txt) => {
-                    let n = new Notification('HTML5 Photo app', {
+                    var n = new Notification('HTML5 Photo app', {
                         body: txt,
                         icon: 'images/logo.png'
                     });
