@@ -402,10 +402,13 @@ window.onload = () => {
     }
     else if (Notification.permission === "granted") {
         window.notify = (txt) => {
-            new Notification('HTML5 Photo app', {
+            let n = new Notification('HTML5 Photo app', {
                 body: txt,
                 icon: 'images/logo.png'
             });
+            setTimeout(() => {
+                n.close()
+            }, 3000);
         };
     }
     else if (Notification.permission !== 'denied') {
@@ -415,10 +418,13 @@ window.onload = () => {
             }
             if (permission === "granted") {
                 window.notify = (txt) => {
-                    new Notification('HTML5 Photo app', {
+                    let n = new Notification('HTML5 Photo app', {
                         body: txt,
                         icon: 'images/logo.png'
                     });
+                    setTimeout(() => {
+                        n.close()
+                    }, 3000);
                 }
             }
         });
