@@ -4,6 +4,7 @@ let video = document.getElementById('video');
 let shootButton = document.getElementById("shoot");
 let resetButton = document.getElementById("reset");
 let saveButton = document.getElementById("save");
+let tracking = document.getElementById('tracking');
 let picLong = document.getElementById("picLong");
 let picLat = document.getElementById("picLat");
 let picAlt = document.getElementById("picAlt");
@@ -160,6 +161,47 @@ resetButton.addEventListener('click', (e) => {
  */
 saveButton.addEventListener('click', (e)=> {
     window.open(canvas.toDataURL(), '_TOP');
+});
+
+/**
+ * Open tracking window
+ */
+tracking.addEventListener('click', (e) => {
+    // Pause stream
+    stateStream = false;
+    window.open('./tracking.html', '_blank', 'fullscreen=yes,menubar=no,statusbar=no,scrollbars=no,width=250,height=300');
+});
+
+/**
+ * When we get response from tracking window
+ */
+window.addEventListener('message', (e) => {
+    console.log(e);
+    if(e.data.img) {
+        console.log("We got an image!");
+    
+        // unPause camera stream
+        stateStream = false;
+
+        // STORE PICS
+        db.pics.put({
+            id: Date.now(),
+            url: e.data.img, // context.getImageData(0, 0, canvas.width, canvas.height),
+            gps: {
+                long: position.longitude,
+                lat: position.latitude,
+                alt: position.altitude
+            }
+        }).then(() => {
+            console.info('Image stored');
+        }).catch((err) =>  {
+            console.error(error);
+        });
+
+        // Update MAP
+        addMarker(position.latitude, position.longitude, `<img src=\"${e.data.img}\" />`);
+        map.flyTo(L.latLng(position.latitude, position.longitude));
+    }
 });
 
 /**
